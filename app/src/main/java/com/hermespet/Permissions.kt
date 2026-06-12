@@ -59,6 +59,12 @@ object Permissions {
         return pm.isIgnoringBatteryOptimizations(ctx.packageName)
     }
 
+    fun exactAlarm(ctx: Context): Boolean {
+        if (Build.VERSION.SDK_INT < 31) return true
+        return (ctx.getSystemService(Context.ALARM_SERVICE) as android.app.AlarmManager)
+            .canScheduleExactAlarms()
+    }
+
     /** Daftar status lengkap untuk ditampilkan (merah/hijau). */
     fun status(ctx: Context): List<Perm> = listOf(
         Perm("Overlay (tampil di atas app)", overlay(ctx), essential = true),
@@ -74,6 +80,7 @@ object Permissions {
         Perm("Ubah setelan sistem (kecerahan)", writeSettings(ctx), false),
         Perm("Semua file (catatan)", allFiles(ctx), false),
         Perm("Jangan Ganggu (DND)", dnd(ctx), false),
+        Perm("Alarm tepat waktu (pengingat)", exactAlarm(ctx), false),
         Perm("Abaikan optimasi baterai", batteryOk(ctx), essential = true),
     )
 
@@ -104,5 +111,7 @@ object Permissions {
         if (!batteryOk(ctx)) add("Optimasi baterai" to
             @Suppress("BatteryLife")
             Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, pkg))
+        if (!exactAlarm(ctx) && Build.VERSION.SDK_INT >= 31) add("Alarm tepat waktu" to
+            Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM, pkg))
     }
 }

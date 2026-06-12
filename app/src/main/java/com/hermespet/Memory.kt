@@ -92,6 +92,22 @@ object Memory {
         emptyList()
     }
 
+    @Synchronized
+    fun delete(ctx: Context, ts: Long) {
+        try {
+            val kept = all(ctx).filter { it.ts != ts }
+            file(ctx).writeText(kept.joinToString("\n") { m ->
+                JSONObject().put("text", m.text).put("importance", m.importance)
+                    .put("ts", m.ts).apply {
+                        m.vec?.let { v ->
+                            put("vec", JSONArray().apply { v.forEach { put(it.toDouble()) } })
+                        }
+                    }.toString()
+            } + if (kept.isEmpty()) "" else "\n")
+        } catch (_: Exception) {
+        }
+    }
+
     // ------------------------------------------------------------- recall
 
     fun recall(ctx: Context, query: String, k: Int, onResult: (List<String>) -> Unit) {

@@ -9,26 +9,29 @@ import kotlin.math.sin
 import kotlin.random.Random
 
 /**
- * Tubuh pet: slime pixel-art 16x16 terinspirasi slime Stardew Valley —
- * badan lebar gepeng, antena berbola di kepala, mata besar gelap, gradasi
- * terang di atas / gelap di bawah — plus pipi merona biar kawaii.
- * Digambar per piksel tanpa anti-alias (tajam khas game retro).
+ * Tubuh pet: slime pixel-art 16x16 ala Stardew Valley yang BERGANTI WARNA
+ * sesuai suasana hati — senang/hijau, sedih/biru, marah/merah, sayang/pink,
+ * ngantuk/ungu — transisi warna mulus. Digambar per piksel tanpa anti-alias.
  */
 class PetView(context: Context) : View(context) {
 
-    enum class Emotion { NEUTRAL, HAPPY, SAD, SLEEPY, SURPRISED, LOVE }
+    enum class Emotion { NEUTRAL, HAPPY, SAD, SLEEPY, SURPRISED, LOVE, ANGRY }
 
     var emotion: Emotion = Emotion.NEUTRAL
         set(v) { field = v; invalidate() }
 
-    /** true saat service sedang menggerakkan pet — memicu bob 8-bit */
     var walking: Boolean = false
-
-    /** -1 = menghadap kiri, 1 = menghadap kanan */
     var facing: Int = 1
 
-    // sprite dasar 16x16: '.'=transparan, O=outline, B=badan,
-    // L=kilau terang, S=bayangan gelap. Baris 0-2 = antena berbola.
+    /** Hidupkan/matikan animasi — dipakai untuk hemat baterai saat layar mati. */
+    var awake: Boolean = true
+        set(v) {
+            if (field == v) return
+            field = v
+            if (v) post(animator) else removeCallbacks(animator)
+        }
+
+    // sprite dasar 16x16: O=outline, B=badan, L=kilau, S=bayangan
     private val base = arrayOf(
         ".......OO.......",
         "......OBBO......",
@@ -48,18 +51,27 @@ class PetView(context: Context) : View(context) {
         "................",
     )
 
-    // piksel tajam: TANPA anti-alias, khas 8-bit
-    private fun crisp(c: String) = Paint().apply { color = Color.parseColor(c) }
+    // warna per-mood: [body, light, shade, outline]
+    private fun palette(e: Emotion): IntArray = when (e) {
+        Emotion.SAD -> intArrayOf(0xFF6FB7E8.toInt(), 0xFFB3DEF7.toInt(), 0xFF3E84B5.toInt(), 0xFF244B66.toInt())
+        Emotion.ANGRY -> intArrayOf(0xFFE8736B.toInt(), 0xFFF7B0AB.toInt(), 0xFFB5443E.toInt(), 0xFF6B2420.toInt())
+        Emotion.LOVE -> intArrayOf(0xFFFF9EC4.toInt(), 0xFFFFD0E4.toInt(), 0xFFD45F92.toInt(), 0xFF7A2E50.toInt())
+        Emotion.SLEEPY -> intArrayOf(0xFFA99BE0.toInt(), 0xFFD6CCF5.toInt(), 0xFF6F5FB0.toInt(), 0xFF3A2E66.toInt())
+        else -> intArrayOf(0xFF7EDB63.toInt(), 0xFFB6F09C.toInt(), 0xFF4FA63E.toInt(), 0xFF2B4A23.toInt())
+    }
 
-    private val outline = crisp("#2B4A23")
-    private val body = crisp("#7EDB63")
-    private val light = crisp("#B6F09C")
-    private val shade = crisp("#4FA63E")
-    private val eye = crisp("#2A2A35")
-    private val white = crisp("#FFFFFF")
-    private val blush = crisp("#FF9EB5")
-    private val heart = crisp("#FF5D8F")
-    private val tear = crisp("#7EC8E3")
+    // warna saat ini (di-lerp menuju target tiap frame) → transisi mulus
+    private val cur = palette(Emotion.NEUTRAL).copyOf()
+
+    private fun crisp() = Paint()
+    private val outline = crisp(); private val body = crisp()
+    private val light = crisp(); private val shade = crisp()
+    private val eye = Paint().apply { color = Color.parseColor("#2A2A35") }
+    private val white = Paint().apply { color = Color.WHITE }
+    private val blush = Paint().apply { color = Color.parseColor("#FF9EB5") }
+    private val heart = Paint().apply { color = Color.parseColor("#FF5D8F") }
+    private val tear = Paint().apply { color = Color.parseColor("#7EC8E3") }
+    private val angryC = Paint().apply { color = Color.parseColor("#C62828") }
 
     private var phase = 0f
     private var blink = false
@@ -74,13 +86,13 @@ class PetView(context: Context) : View(context) {
                 nextBlinkAt = now + if (blink) 130 else (1500 + Random.nextLong(3500))
             }
             invalidate()
-            postDelayed(this, 16) // ~60 fps — piksel tetap tajam, gerak mulus
+            if (awake) postDelayed(this, 16) // ~60fps; dimatikan saat layar off
         }
     }
 
     override fun onAttachedToWindow() {
         super.onAttachedToWindow()
-        post(animator)
+        if (awake) post(animator)
     }
 
     override fun onDetachedFromWindow() {
@@ -98,6 +110,15 @@ class PetView(context: Context) : View(context) {
         canvas.drawRect(x, y, x + cell, y + cell, paint)
     }
 
+    private fun lerp(a: Int, b: Int, t: Float): Int {
+        val ar = (a shr 16) and 0xFF; val ag = (a shr 8) and 0xFF; val ab = a and 0xFF
+        val br = (b shr 16) and 0xFF; val bg = (b shr 8) and 0xFF; val bb = b and 0xFF
+        val r = (ar + (br - ar) * t).toInt()
+        val g = (ag + (bg - ag) * t).toInt()
+        val bl = (ab + (bb - ab) * t).toInt()
+        return (0xFF shl 24) or (r shl 16) or (g shl 8) or bl
+    }
+
     override fun onDraw(canvas: Canvas) {
         val w = width.toFloat()
         val h = height.toFloat()
@@ -105,14 +126,17 @@ class PetView(context: Context) : View(context) {
         offX = (w - cell * 16f) / 2f
         offY = (h - cell * 16f) / 2f
 
-        // gerak halus sub-piksel: hop sinus saat jalan, "napas" pelan saat diam,
-        // plus squash & stretch ala jelly berpusat di kaki
+        // transisi warna mulus menuju palette mood saat ini
+        val target = palette(emotion)
+        for (i in cur.indices) cur[i] = lerp(cur[i], target[i], 0.12f)
+        body.color = cur[0]; light.color = cur[1]; shade.color = cur[2]; outline.color = cur[3]
+
         val bobPx: Float
         val squash: Float
         if (walking) {
             val hop = kotlin.math.abs(sin(phase * 2.2f))
             bobPx = hop * cell * 1.3f
-            squash = (1f - hop) * 0.09f // menyentuh tanah = sedikit gepeng
+            squash = (1f - hop) * 0.09f
         } else {
             bobPx = (sin(phase * 0.45f) + 1f) * 0.5f * cell * 0.35f
             squash = sin(phase * 0.45f) * 0.03f
@@ -123,7 +147,6 @@ class PetView(context: Context) : View(context) {
         canvas.scale(1f + squash, 1f - squash, w / 2f, offY + cell * 15f)
         if (facing < 0) canvas.scale(-1f, 1f, w / 2f, h / 2f)
 
-        // badan dasar
         for (r in base.indices) {
             val row = base[r]
             for (c in row.indices) {
@@ -136,7 +159,6 @@ class PetView(context: Context) : View(context) {
             }
         }
 
-        // mata besar khas slime Stardew (2x4) dengan kilau putih
         val sleepy = emotion == Emotion.SLEEPY
         when {
             blink || sleepy -> {
@@ -144,42 +166,51 @@ class PetView(context: Context) : View(context) {
                 px(canvas, 10, 8, eye); px(canvas, 11, 8, eye)
             }
             emotion == Emotion.LOVE -> {
-                drawPixelHeart(canvas, 3, 6)
-                drawPixelHeart(canvas, 10, 6)
+                drawPixelHeart(canvas, 3, 6); drawPixelHeart(canvas, 10, 6)
             }
             else -> {
                 for (r in 6..9) {
                     px(canvas, 4, r, eye); px(canvas, 5, r, eye)
                     px(canvas, 10, r, eye); px(canvas, 11, r, eye)
                 }
-                px(canvas, 4, 6, white)
-                px(canvas, 10, 6, white)
+                px(canvas, 4, 6, white); px(canvas, 10, 6, white)
             }
         }
 
-        // pipi merona
-        px(canvas, 2, 10, blush); px(canvas, 3, 10, blush)
-        px(canvas, 12, 10, blush); px(canvas, 13, 10, blush)
+        // alis marah (diagonal) di atas mata
+        if (emotion == Emotion.ANGRY) {
+            px(canvas, 3, 5, angryC); px(canvas, 4, 5, eye); px(canvas, 5, 6, eye)
+            px(canvas, 12, 5, angryC); px(canvas, 11, 5, eye); px(canvas, 10, 6, eye)
+        }
 
-        // mulut + aksesori emosi
+        // pipi merona (tidak saat marah)
+        if (emotion != Emotion.ANGRY) {
+            px(canvas, 2, 10, blush); px(canvas, 3, 10, blush)
+            px(canvas, 12, 10, blush); px(canvas, 13, 10, blush)
+        }
+
         when (emotion) {
-            Emotion.HAPPY, Emotion.LOVE -> { // senyum U
+            Emotion.HAPPY, Emotion.LOVE -> {
                 px(canvas, 6, 10, eye); px(canvas, 9, 10, eye)
                 px(canvas, 7, 11, eye); px(canvas, 8, 11, eye)
             }
-            Emotion.NEUTRAL -> {
-                px(canvas, 7, 11, eye); px(canvas, 8, 11, eye)
-            }
-            Emotion.SAD -> { // cemberut ∩ + air mata
+            Emotion.NEUTRAL -> { px(canvas, 7, 11, eye); px(canvas, 8, 11, eye) }
+            Emotion.SAD -> {
                 px(canvas, 7, 10, eye); px(canvas, 8, 10, eye)
                 px(canvas, 6, 11, eye); px(canvas, 9, 11, eye)
                 px(canvas, 12, 8, tear); px(canvas, 12, 9, tear)
             }
-            Emotion.SURPRISED -> { // mulut o 2x2
+            Emotion.ANGRY -> { // mulut menggeram + uap
+                px(canvas, 6, 11, eye); px(canvas, 7, 11, eye)
+                px(canvas, 8, 11, eye); px(canvas, 9, 11, eye)
+                px(canvas, 7, 10, eye); px(canvas, 8, 10, eye)
+                px(canvas, 13, 4, white); px(canvas, 14, 3, white)
+            }
+            Emotion.SURPRISED -> {
                 px(canvas, 7, 10, eye); px(canvas, 8, 10, eye)
                 px(canvas, 7, 11, eye); px(canvas, 8, 11, eye)
             }
-            Emotion.SLEEPY -> { // mulut kecil + Z melayang
+            Emotion.SLEEPY -> {
                 px(canvas, 7, 11, eye)
                 px(canvas, 12, 1, eye); px(canvas, 13, 1, eye); px(canvas, 14, 1, eye)
                 px(canvas, 13, 2, eye)
@@ -190,7 +221,6 @@ class PetView(context: Context) : View(context) {
         canvas.restore()
     }
 
-    /** Hati piksel 3x3, pojok kiri-atas di (col,row). */
     private fun drawPixelHeart(canvas: Canvas, col: Int, row: Int) {
         px(canvas, col, row, heart); px(canvas, col + 2, row, heart)
         px(canvas, col, row + 1, heart); px(canvas, col + 1, row + 1, heart)
@@ -205,6 +235,7 @@ class PetView(context: Context) : View(context) {
             "sleepy", "ngantuk" -> Emotion.SLEEPY
             "surprised", "kaget" -> Emotion.SURPRISED
             "love", "sayang" -> Emotion.LOVE
+            "angry", "marah" -> Emotion.ANGRY
             else -> Emotion.NEUTRAL
         }
     }

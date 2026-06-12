@@ -35,6 +35,13 @@ object Actions {
             "wifi_panel" -> wifiPanel(ctx)
             "bluetooth_panel" -> openSettings(ctx, Settings.ACTION_BLUETOOTH_SETTINGS,
                 "Kubukakan setelan Bluetooth 📡")
+            "set_reminder" -> {
+                val mins = action.optInt("minutes", 0)
+                val delay = if (mins > 0) mins * 60_000L
+                else alarmDelay(action.optInt("hour", -1), action.optInt("minute", 0))
+                if (delay <= 0) "Kapan mau kuingatkan? 🤔"
+                else ReminderReceiver.schedule(ctx, delay, action.optString("text", "Pengingat!"))
+            }
             "dnd" -> dnd(ctx, action.optBoolean("on", true))
             "set_alarm" -> setAlarm(ctx, action.optInt("hour", 7),
                 action.optInt("minute", 0), action.optString("label", "HermesPet"))
@@ -200,6 +207,19 @@ object Actions {
     }
 
     // ------------------------------------------------------------- alarm
+
+    /** Selisih ms menuju jam:menit berikutnya (hari ini atau besok). */
+    private fun alarmDelay(hour: Int, minute: Int): Long {
+        if (hour < 0) return 0
+        val now = java.util.Calendar.getInstance()
+        val t = java.util.Calendar.getInstance().apply {
+            set(java.util.Calendar.HOUR_OF_DAY, hour.coerceIn(0, 23))
+            set(java.util.Calendar.MINUTE, minute.coerceIn(0, 59))
+            set(java.util.Calendar.SECOND, 0)
+        }
+        if (t.timeInMillis <= now.timeInMillis) t.add(java.util.Calendar.DAY_OF_YEAR, 1)
+        return t.timeInMillis - now.timeInMillis
+    }
 
     private fun setAlarm(ctx: Context, hour: Int, minute: Int, label: String): String {
         ctx.startActivity(Intent(android.provider.AlarmClock.ACTION_SET_ALARM).apply {

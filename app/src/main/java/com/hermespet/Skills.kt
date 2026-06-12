@@ -71,6 +71,14 @@ object Skills {
         return "Skill \"$name\" kujalankan: " + results.joinToString(" · ").ifBlank { "beres ✓" }
     }
 
+    /** Pasangan (nama, deskripsi) untuk ditampilkan di UI. */
+    fun list(ctx: Context): List<Pair<String, String>> {
+        val skills = load(ctx)
+        return skills.keys().asSequence().map { name ->
+            name to (skills.optJSONObject(name)?.optString("description") ?: "")
+        }.toList()
+    }
+
     /** Daftar skill untuk disuntikkan ke system prompt otak. */
     fun listForPrompt(ctx: Context): String {
         val skills = load(ctx)

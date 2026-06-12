@@ -73,6 +73,19 @@ object Prefs {
         get() = sp(this).getString("soul_md", DEFAULT_SOUL) ?: DEFAULT_SOUL
         set(v) = sp(this).edit().putString("soul_md", v.ifBlank { DEFAULT_SOUL }).apply()
 
+    // --- suasana hati persisten ([[Mood]]) ---
+    var Context.moodState: String
+        get() = sp(this).getString("mood_state", "NEUTRAL") ?: "NEUTRAL"
+        set(v) = sp(this).edit().putString("mood_state", v).apply()
+
+    var Context.moodSince: Long
+        get() = sp(this).getLong("mood_since", 0L)
+        set(v) = sp(this).edit().putLong("mood_since", v).apply()
+
+    var Context.lastInteraction: Long
+        get() = sp(this).getLong("last_interaction", System.currentTimeMillis())
+        set(v) = sp(this).edit().putLong("last_interaction", v).apply()
+
     var Context.petX: Int
         get() = sp(this).getInt("pet_x", 100)
         set(v) = sp(this).edit().putInt("pet_x", v).apply()

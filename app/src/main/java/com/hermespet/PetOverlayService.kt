@@ -8,6 +8,7 @@ import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
 import android.graphics.Color
@@ -84,10 +85,31 @@ class PetOverlayService : Service() {
             if (status == TextToSpeech.SUCCESS) tts?.language = Locale("id", "ID")
         }
         buildOverlay()
+        registerReceiver(screenReceiver, IntentFilter().apply {
+            addAction(Intent.ACTION_SCREEN_ON)
+            addAction(Intent.ACTION_SCREEN_OFF)
+        })
         handler.post(walkLoop)
         handler.postDelayed(tickLoop, 5_000)
         handler.postDelayed(moodLoop, 20_000) // cek pertama tak lama setelah start
+        handler.post(moodTick)
+        pet.emotion = Mood.current(this)
         say("Halo! Aku hidup! 🐾", PetView.Emotion.HAPPY)
+        transientUntil = System.currentTimeMillis() + 8_000
+    }
+
+    // --- hemat baterai: hentikan animasi & jalan saat layar mati ---
+    @Volatile private var screenOn = true
+    private val screenReceiver = object : android.content.BroadcastReceiver() {
+        override fun onReceive(c: Context?, i: Intent?) {
+            when (i?.action) {
+                Intent.ACTION_SCREEN_OFF -> { screenOn = false; pet.awake = false }
+                Intent.ACTION_SCREEN_ON -> {
+                    screenOn = true; pet.awake = true
+                    pet.emotion = Mood.current(this@PetOverlayService)
+                }
+            }
+        }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -100,6 +122,7 @@ class PetOverlayService : Service() {
         handler.removeCallbacksAndMessages(null)
         Senses.stop(this)
         tts?.shutdown()
+        runCatching { unregisterReceiver(screenReceiver) }
         closeChat()
         if (bubbleShown) runCatching { wm.removeView(bubble) }
         runCatching { wm.removeView(root) }
@@ -362,6 +385,10 @@ class PetOverlayService : Service() {
 
     private val walkLoop = object : Runnable {
         override fun run() {
+            if (!screenOn) { // layar mati → jangan render/gerak (hemat baterai)
+                handler.postDelayed(this, 1_000)
+                return
+            }
             val now = System.currentTimeMillis()
             val maxX = (resources.displayMetrics.widthPixels - pet.width).coerceAtLeast(1)
             if (now >= pausedUntil) {
@@ -425,17 +452,46 @@ class PetOverlayService : Service() {
         }
     }
 
+    // baseline emosi pet mengikuti suasana hati saat idle (tiap 15 detik),
+    // kecuali sedang menampilkan reaksi sesaat (transientUntil)
+    private var transientUntil = 0L
+    private val moodTick = object : Runnable {
+        override fun run() {
+            if (System.currentTimeMillis() > transientUntil) {
+                pet.emotion = Mood.current(this@PetOverlayService)
+            }
+            handler.postDelayed(this, 15_000)
+        }
+    }
+
     fun onNotificationSeen(pkg: String, title: String, text: String) {
         PetLog.add(this, "notif", "$pkg: $title — ${text.take(80)}")
         val data = JSONObject().put("package", pkg).put("title", title).put("text", text)
         sendToBrain("notification", data)
     }
 
+    /** Dipanggil ReminderReceiver saat pengingat tiba & pet sedang hidup. */
+    fun announceReminder(text: String) {
+        handler.post {
+            say("⏰ $text", PetView.Emotion.SURPRISED)
+            speak("Pengingat! $text")
+            transientUntil = System.currentTimeMillis() + 10_000
+        }
+    }
+
     private fun sendToBrain(type: String, data: JSONObject) {
+        // interaksi langsung memperbarui "kapan terakhir disapa" (anti-kesepian)
+        if (type == "chat" || type == "poke") Mood.noteInteraction(this)
         Brain.sendEvent(this, type, data) { reply ->
             reply ?: return@sendEvent
             val emotion = reply.optString("emotion", "")
-            if (emotion.isNotEmpty()) pet.emotion = PetView.emotionFrom(emotion)
+            if (emotion.isNotEmpty()) {
+                val emo = PetView.emotionFrom(emotion)
+                pet.emotion = emo
+                transientUntil = System.currentTimeMillis() + 12_000
+                // chat & cek-mood kamera membentuk suasana hati yang menetap
+                if (type == "chat" || type == "mood") Mood.note(this, emo)
+            }
             val text = reply.optString("say", "")
             if (text.isNotEmpty()) {
                 PetLog.add(this, "pet", text)

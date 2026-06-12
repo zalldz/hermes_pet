@@ -215,6 +215,9 @@ class MainActivity : Activity() {
         col.addView(button("📜 Riwayat chat & log") {
             startActivity(Intent(this, LogActivity::class.java))
         })
+        col.addView(button("🧠 Kelola memori & skill") {
+            startActivity(Intent(this, ManagerActivity::class.java))
+        })
 
         // --- start/stop ---
         col.addView(section("4. Jalankan"))

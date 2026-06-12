@@ -53,7 +53,10 @@ object Brain {
     private fun systemPrompt(ctx: Context): String =
         ctx.soulMd + "\n\nFORMAT WAJIB: balas HANYA dengan JSON satu baris: " +
             "{\"say\": \"<ucapanmu, bahasa Indonesia santai>\", " +
-            "\"emotion\": \"<happy|sad|neutral|sleepy|surprised|love>\"}\n" +
+            "\"emotion\": \"<happy|sad|neutral|sleepy|surprised|love|angry>\"}\n" +
+            "Warna tubuhmu otomatis mengikuti emosi (hijau senang, biru sedih, " +
+            "merah marah, pink sayang, ungu ngantuk) — pilih emotion yang jujur " +
+            "mencerminkan perasaanmu & empati ke mood pemilik.\n" +
             "Kamu juga bisa MELAKUKAN aksi di HP. Kalau (dan hanya kalau) pemilik " +
             "memintanya, tambahkan field \"action\" di JSON, salah satu dari:\n" +
             "{\"type\":\"volume\",\"level\":0-100} | {\"type\":\"volume_up\"} | " +
@@ -69,6 +72,9 @@ object Brain {
             "{\"type\":\"wifi_panel\"} | {\"type\":\"bluetooth_panel\"} | " +
             "{\"type\":\"dnd\",\"on\":true/false} (mode Jangan Ganggu) | " +
             "{\"type\":\"set_alarm\",\"hour\":0-23,\"minute\":0-59,\"label\":\"<judul>\"} | " +
+            "{\"type\":\"set_reminder\",\"minutes\":<menit dari sekarang> ATAU " +
+            "\"hour\":0-23,\"minute\":0-59,\"text\":\"<isi pengingat>\"} " +
+            "(pengingat terjadwal yang bunyi tepat waktu walau kamu idle) | " +
             "{\"type\":\"save_note\",\"filename\":\"<nama>.txt\",\"text\":\"<isi>\"} " +
             "(catat ke Documents/HermesPet) | " +
             "{\"type\":\"read_note\",\"filename\":\"<nama>.txt\"} | " +
