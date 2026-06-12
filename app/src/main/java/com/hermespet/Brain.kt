@@ -47,6 +47,7 @@ object Brain {
     private var lastNotifSay = 0L
     private var lastWeatherSay = 0L
     private var lastLowBatt = 0L
+    private var lastEventReminded = ""
 
     /** SOUL.md pengguna + aturan format yang tidak boleh dilanggar (untuk parsing). */
     private fun systemPrompt(ctx: Context): String =
@@ -79,14 +80,31 @@ object Brain {
             onReply(reply("Baterai tinggal $battery%! Cas dong 🥺", "sad"))
             return
         }
+        // pengingat acara kalender yang sudah dekat (≤45 menit)
+        val eventTitle = data.optString("next_event")
+        val eventMin = data.optInt("next_event_min", -1)
+        if (eventTitle.isNotEmpty() && eventMin in 1..45 && eventTitle != lastEventReminded) {
+            lastEventReminded = eventTitle
+            askHermes(ctx,
+                "Sebentar lagi ($eventMin menit) pemilikmu ada acara di kalender: \"$eventTitle\". " +
+                    "Ingatkan dia dengan singkat dan semangat.",
+                "Psst, $eventMin menit lagi: $eventTitle ⏰", "surprised", onReply)
+            return
+        }
         if (now - lastWeatherSay > WEATHER_INTERVAL_MS) {
             lastWeatherSay = now
             fetchWeather(ctx) { w ->
                 if (w == null) { onReply(null); return@fetchWeather }
                 val desc = w.first; val temp = w.second
                 val emo = if ("hujan" in desc || "badai" in desc) "sad" else "happy"
+                val extra = buildString {
+                    if (data.has("light_lux")) append(" Cahaya sekitar pemilik: ${data.optInt("light_lux")} lux.")
+                    if (data.has("steps_since_pet_on")) append(" Langkah sejak pet menyala: ${data.optInt("steps_since_pet_on")}.")
+                    append(" Jam sekarang: ${data.optInt("hour")}.")
+                }
                 askHermes(ctx,
-                    "Cuaca sekarang $desc, suhu $temp°C. Komentari singkat, beri saran kalau relevan.",
+                    "Cuaca sekarang $desc, suhu $temp°C.$extra " +
+                        "Komentari singkat, beri saran kalau relevan (payung, istirahat, jalan-jalan, dll).",
                     "Di luar $desc, $temp°C nih!", emo, onReply)
             }
             return
@@ -129,8 +147,8 @@ object Brain {
     private fun handleChat(ctx: Context, data: JSONObject, onReply: (JSONObject?) -> Unit) {
         val text = data.optString("text").take(500)
         askHermes(ctx,
-            "Pemilikmu berkata kepadamu: \"$text\". Jawab dengan hangat, membantu, " +
-                "dan tetap singkat (boleh sampai 200 huruf untuk chat).",
+            "Pemilikmu berkata kepadamu: \"$text\". Jawab dengan hangat dan membantu — " +
+                "untuk chat boleh menjawab panjang secukupnya, jangan dipotong.",
             "Aku dengar kamu! Tapi isi API key dulu di pengaturan biar aku bisa mikir 🥺",
             "love", onReply)
     }
@@ -156,7 +174,7 @@ object Brain {
         }
         val body = JSONObject()
             .put("model", ctx.apiModel)
-            .put("max_tokens", 200)
+            .put("max_tokens", 700) // cukup untuk jawaban chat panjang tanpa terpotong
             .put("temperature", 0.8)
             .put("messages", JSONArray()
                 .put(JSONObject().put("role", "system").put("content", systemPrompt(ctx)))
@@ -196,7 +214,7 @@ object Brain {
         if (start < 0 || end <= start) return null
         return try {
             val obj = JSONObject(text.substring(start, end + 1))
-            if (obj.has("say")) reply(obj.optString("say").take(250),
+            if (obj.has("say")) reply(obj.optString("say").take(1500),
                 obj.optString("emotion", "neutral")) else null
         } catch (e: Exception) { null }
     }

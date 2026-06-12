@@ -47,7 +47,7 @@ class PetOverlayService : Service() {
         private const val BASE_SIZE_DP = 96
         private const val TICK_MS = 60_000L
         private const val MOOD_MS = 60 * 60_000L // tiap jam
-        private const val WALK_FRAME_MS = 50L
+        private const val WALK_FRAME_MS = 16L // ~60 fps
     }
 
     private lateinit var wm: WindowManager
@@ -57,9 +57,11 @@ class PetOverlayService : Service() {
     private lateinit var lp: WindowManager.LayoutParams
     private val handler = Handler(Looper.getMainLooper())
 
-    // --- gerak jalan ---
+    // --- gerak jalan (posisi float supaya mulus, dieasing) ---
     private var walkTargetX = -1
     private var pausedUntil = 0L
+    private var posX = 0f
+    private var speed = 0f
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -68,6 +70,7 @@ class PetOverlayService : Service() {
         instance = this
         startAsForeground()
         wm = getSystemService(WINDOW_SERVICE) as WindowManager
+        Senses.start(this)
         buildOverlay()
         handler.post(walkLoop)
         handler.postDelayed(tickLoop, 5_000)
@@ -83,6 +86,7 @@ class PetOverlayService : Service() {
     override fun onDestroy() {
         instance = null
         handler.removeCallbacksAndMessages(null)
+        Senses.stop(this)
         closeChat()
         runCatching { wm.removeView(root) }
         super.onDestroy()
@@ -102,7 +106,8 @@ class PetOverlayService : Service() {
             }
             val p = dp(8f).toInt()
             setPadding(p, p / 2, p, p / 2)
-            maxWidth = dp(220f).toInt()
+            // gelembung melebar dinamis sampai 75% layar, tinggi mengikuti isi
+            maxWidth = (resources.displayMetrics.widthPixels * 0.75f).toInt()
             visibility = View.GONE
         }
         root = LinearLayout(this).apply {
@@ -124,6 +129,7 @@ class PetOverlayService : Service() {
             x = petX
             y = petY
         }
+        posX = lp.x.toFloat()
 
         applyScale(addToWindow = true)
         attachTouch()
@@ -174,7 +180,7 @@ class PetOverlayService : Service() {
                 }
                 MotionEvent.ACTION_UP -> {
                     when {
-                        dragging -> { petX = lp.x; petY = lp.y }
+                        dragging -> { petX = lp.x; petY = lp.y; posX = lp.x.toFloat() }
                         System.currentTimeMillis() - downAt > 400 -> toggleChat() // tahan = ngobrol
                         else -> onPoked()
                     }
@@ -258,21 +264,30 @@ class PetOverlayService : Service() {
             val now = System.currentTimeMillis()
             val maxX = (resources.displayMetrics.widthPixels - pet.width).coerceAtLeast(1)
             if (now >= pausedUntil) {
-                if (walkTargetX < 0 || abs(lp.x - walkTargetX) < 8) {
+                val dist = walkTargetX - posX
+                if (walkTargetX < 0 || abs(dist) < 4f) {
                     // sampai tujuan → istirahat, lalu pilih tujuan baru
                     walkTargetX = Random.nextInt(0, maxX)
                     pausedUntil = now + Random.nextLong(3_000, 15_000)
                     pet.walking = false
+                    speed = 0f
                 } else {
-                    val step = (4 * petScale).toInt().coerceAtLeast(2)
-                    val dir = if (walkTargetX > lp.x) 1 else -1
-                    lp.x = (lp.x + dir * step).coerceIn(0, maxX)
+                    val dir = if (dist > 0) 1 else -1
+                    // easing: melambat mendekati tujuan, akselerasi halus saat mulai
+                    val maxSpeed = 2.2f * petScale
+                    val targetSpeed = minOf(maxSpeed, abs(dist) / 25f).coerceAtLeast(0.5f)
+                    speed += (targetSpeed - speed) * 0.07f
+                    posX = (posX + dir * speed).coerceIn(0f, maxX.toFloat())
                     pet.facing = dir
                     pet.walking = true
-                    runCatching { wm.updateViewLayout(root, lp) }
+                    if (lp.x != posX.toInt()) {
+                        lp.x = posX.toInt()
+                        runCatching { wm.updateViewLayout(root, lp) }
+                    }
                 }
             } else {
                 pet.walking = false
+                speed = 0f
             }
             handler.postDelayed(this, WALK_FRAME_MS)
         }
@@ -286,6 +301,9 @@ class PetOverlayService : Service() {
             val data = JSONObject()
                 .put("battery", bm.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY))
                 .put("hour", Calendar.getInstance().get(Calendar.HOUR_OF_DAY))
+            // indra tambahan: cahaya, langkah, lokasi (cuaca otomatis), kalender
+            val senses = Senses.snapshot(this@PetOverlayService)
+            senses.keys().forEach { k -> data.put(k, senses.get(k)) }
             sendToBrain("tick", data)
             handler.postDelayed(this, TICK_MS)
         }
@@ -322,7 +340,18 @@ class PetOverlayService : Service() {
         bubble.text = text
         bubble.visibility = View.VISIBLE
         handler.removeCallbacks(hideBubble)
-        handler.postDelayed(hideBubble, 8_000)
+        // durasi baca menyesuaikan panjang teks (6–30 detik)
+        val duration = (6_000L + text.length * 55L).coerceAtMost(30_000L)
+        handler.postDelayed(hideBubble, duration)
+        // geser pet kalau gelembung melebihi tepi layar
+        root.post {
+            val maxX = resources.displayMetrics.widthPixels - root.width
+            if (lp.x > maxX && maxX >= 0) {
+                lp.x = maxX
+                posX = lp.x.toFloat()
+                runCatching { wm.updateViewLayout(root, lp) }
+            }
+        }
     }
 
     private val hideBubble = Runnable { bubble.visibility = View.GONE }

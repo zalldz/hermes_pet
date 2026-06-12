@@ -67,14 +67,14 @@ class PetView(context: Context) : View(context) {
 
     private val animator = object : Runnable {
         override fun run() {
-            phase += 0.35f
+            phase += 0.13f
             val now = System.currentTimeMillis()
             if (now > nextBlinkAt) {
                 blink = !blink
                 nextBlinkAt = now + if (blink) 130 else (1500 + Random.nextLong(3500))
             }
             invalidate()
-            postDelayed(this, 80) // ~12 fps, biar terasa retro
+            postDelayed(this, 16) // ~60 fps — piksel tetap tajam, gerak mulus
         }
     }
 
@@ -105,15 +105,22 @@ class PetView(context: Context) : View(context) {
         offX = (w - cell * 16f) / 2f
         offY = (h - cell * 16f) / 2f
 
-        // bob 8-bit: lompat 1 piksel, lebih hidup saat jalan
-        val bob = if (walking) {
-            if (sin(phase) > 0) -1 else 0
+        // gerak halus sub-piksel: hop sinus saat jalan, "napas" pelan saat diam,
+        // plus squash & stretch ala jelly berpusat di kaki
+        val bobPx: Float
+        val squash: Float
+        if (walking) {
+            val hop = kotlin.math.abs(sin(phase * 2.2f))
+            bobPx = hop * cell * 1.3f
+            squash = (1f - hop) * 0.09f // menyentuh tanah = sedikit gepeng
         } else {
-            if (sin(phase * 0.4f) > 0.7f) -1 else 0
+            bobPx = (sin(phase * 0.45f) + 1f) * 0.5f * cell * 0.35f
+            squash = sin(phase * 0.45f) * 0.03f
         }
 
         canvas.save()
-        canvas.translate(0f, bob * cell)
+        canvas.translate(0f, -bobPx)
+        canvas.scale(1f + squash, 1f - squash, w / 2f, offY + cell * 15f)
         if (facing < 0) canvas.scale(-1f, 1f, w / 2f, h / 2f)
 
         // badan dasar

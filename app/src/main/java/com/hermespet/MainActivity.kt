@@ -66,6 +66,20 @@ class MainActivity : Activity() {
                 requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 2)
             })
         }
+        col.addView(button("Izin lokasi (cuaca otomatis ikut posisimu)") {
+            requestPermissions(arrayOf(
+                Manifest.permission.ACCESS_COARSE_LOCATION,
+                Manifest.permission.ACCESS_FINE_LOCATION
+            ), 3)
+        })
+        if (Build.VERSION.SDK_INT >= 29) {
+            col.addView(button("Izin aktivitas (hitung langkahmu)") {
+                requestPermissions(arrayOf(Manifest.permission.ACTIVITY_RECOGNITION), 4)
+            })
+        }
+        col.addView(button("Izin kalender (pengingat acara)") {
+            requestPermissions(arrayOf(Manifest.permission.READ_CALENDAR), 5)
+        })
 
         // --- koneksi otak ---
         col.addView(section("2. Otak (model Hermes)"))
