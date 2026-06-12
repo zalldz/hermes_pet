@@ -63,6 +63,7 @@ object Brain {
             "notification" -> handleNotification(ctx, data, onReply)
             "mood" -> handleMood(ctx, data, onReply)
             "poke" -> handlePoke(ctx, onReply)
+            "chat" -> handleChat(ctx, data, onReply)
             else -> onReply(null)
         }
     }
@@ -122,6 +123,15 @@ object Brain {
             "Kamu baru melihat wajah pemilikmu lewat kamera depan. Tebakan mood: $guess " +
                 "(probabilitas senyum ${"%.2f".format(smile)}). Beri komentar empatik singkat.",
             fallback.first, fallback.second, onReply)
+    }
+
+    private fun handleChat(ctx: Context, data: JSONObject, onReply: (JSONObject?) -> Unit) {
+        val text = data.optString("text").take(500)
+        askHermes(ctx,
+            "Pemilikmu berkata kepadamu: \"$text\". Jawab dengan hangat, membantu, " +
+                "dan tetap singkat (boleh sampai 200 huruf untuk chat).",
+            "Aku dengar kamu! Tapi isi API key dulu di pengaturan biar aku bisa mikir 🥺",
+            "love", onReply)
     }
 
     private fun handlePoke(ctx: Context, onReply: (JSONObject?) -> Unit) {

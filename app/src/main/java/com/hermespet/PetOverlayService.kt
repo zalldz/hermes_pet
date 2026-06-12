@@ -24,6 +24,8 @@ import android.view.MotionEvent
 import android.view.ScaleGestureDetector
 import android.view.View
 import android.view.WindowManager
+import android.widget.Button
+import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.TextView
 import com.hermespet.Prefs.moodCheckEnabled
@@ -81,6 +83,7 @@ class PetOverlayService : Service() {
     override fun onDestroy() {
         instance = null
         handler.removeCallbacksAndMessages(null)
+        closeChat()
         runCatching { wm.removeView(root) }
         super.onDestroy()
     }
@@ -145,6 +148,7 @@ class PetOverlayService : Service() {
         var downX = 0f; var downY = 0f
         var startX = 0; var startY = 0
         var dragging = false
+        var downAt = 0L
 
         root.setOnTouchListener { _, ev ->
             scaleDetector.onTouchEvent(ev)
@@ -154,6 +158,7 @@ class PetOverlayService : Service() {
                     downX = ev.rawX; downY = ev.rawY
                     startX = lp.x; startY = lp.y
                     dragging = false
+                    downAt = System.currentTimeMillis()
                     pausedUntil = System.currentTimeMillis() + 8_000 // jangan jalan saat dipegang
                     true
                 }
@@ -168,16 +173,77 @@ class PetOverlayService : Service() {
                     true
                 }
                 MotionEvent.ACTION_UP -> {
-                    if (dragging) {
-                        petX = lp.x; petY = lp.y
-                    } else {
-                        onPoked()
+                    when {
+                        dragging -> { petX = lp.x; petY = lp.y }
+                        System.currentTimeMillis() - downAt > 400 -> toggleChat() // tahan = ngobrol
+                        else -> onPoked()
                     }
                     true
                 }
                 else -> false
             }
         }
+    }
+
+    // ---------------------------------------------------------------- ngobrol
+
+    private var chatView: View? = null
+
+    private fun toggleChat() {
+        if (chatView != null) { closeChat(); return }
+        val input = EditText(this).apply {
+            hint = "Ngobrol sama aku..."
+            isSingleLine = true
+            setTextColor(Color.parseColor("#3E2723"))
+            setHintTextColor(Color.parseColor("#9E9E9E"))
+        }
+        val send = Button(this).apply { text = "➤" }
+        val row = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            background = GradientDrawable().apply {
+                setColor(Color.WHITE)
+                cornerRadius = dp(16f)
+                setStroke(2, Color.parseColor("#33334D"))
+            }
+            val p = dp(6f).toInt()
+            setPadding(p, p, p, p)
+            addView(input, LinearLayout.LayoutParams(dp(200f).toInt(),
+                LinearLayout.LayoutParams.WRAP_CONTENT))
+            addView(send)
+        }
+        val clp = WindowManager.LayoutParams(
+            WindowManager.LayoutParams.WRAP_CONTENT,
+            WindowManager.LayoutParams.WRAP_CONTENT,
+            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+            WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL, // fokusable → keyboard bisa muncul
+            PixelFormat.TRANSLUCENT
+        ).apply {
+            gravity = Gravity.TOP or Gravity.START
+            x = lp.x
+            y = lp.y + root.height + dp(4f).toInt()
+            softInputMode = WindowManager.LayoutParams.SOFT_INPUT_STATE_VISIBLE
+        }
+
+        fun submit() {
+            val text = input.text.toString().trim()
+            closeChat()
+            if (text.isNotEmpty()) {
+                say("🤔...", null)
+                sendToBrain("chat", JSONObject().put("text", text))
+            }
+        }
+        send.setOnClickListener { submit() }
+        input.setOnEditorActionListener { _, _, _ -> submit(); true }
+
+        wm.addView(row, clp)
+        chatView = row
+        input.requestFocus()
+        pausedUntil = System.currentTimeMillis() + 60_000 // diam selama ngobrol
+    }
+
+    private fun closeChat() {
+        chatView?.let { runCatching { wm.removeView(it) } }
+        chatView = null
     }
 
     private fun onPoked() {

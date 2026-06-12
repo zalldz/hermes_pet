@@ -178,11 +178,21 @@ def handle_poke(_data):
     )
 
 
+def handle_chat(data):
+    text = data.get("text", "")[:500]
+    return hermes_reply(
+        f"Pemilikmu berkata kepadamu: '{text}'. Jawab hangat, membantu, singkat.",
+        "Aku dengar kamu! Tapi HERMES_CMD belum di-set, jadi aku belum bisa mikir 🥺",
+        "love",
+    )
+
+
 HANDLERS = {
     "tick": handle_tick,
     "notification": handle_notification,
     "mood": handle_mood,
     "poke": handle_poke,
+    "chat": handle_chat,
 }
 
 
