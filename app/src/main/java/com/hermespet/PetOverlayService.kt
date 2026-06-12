@@ -62,6 +62,8 @@ class PetOverlayService : Service() {
     private lateinit var bubble: TextView
     private lateinit var pet: PetView
     private lateinit var lp: WindowManager.LayoutParams
+    private lateinit var bubbleLp: WindowManager.LayoutParams
+    private var bubbleShown = false
     private val handler = Handler(Looper.getMainLooper())
 
     // --- gerak jalan (posisi float supaya mulus, dieasing) ---
@@ -99,6 +101,7 @@ class PetOverlayService : Service() {
         Senses.stop(this)
         tts?.shutdown()
         closeChat()
+        if (bubbleShown) runCatching { wm.removeView(bubble) }
         runCatching { wm.removeView(root) }
         super.onDestroy()
     }
@@ -107,24 +110,10 @@ class PetOverlayService : Service() {
 
     private fun buildOverlay() {
         pet = PetView(this)
-        bubble = TextView(this).apply {
-            setTextColor(Color.parseColor("#3E2723"))
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
-            background = GradientDrawable().apply {
-                setColor(Color.WHITE)
-                cornerRadius = dp(12f)
-                setStroke(2, Color.parseColor("#3E2723"))
-            }
-            val p = dp(8f).toInt()
-            setPadding(p, p / 2, p, p / 2)
-            // gelembung melebar dinamis sampai 75% layar, tinggi mengikuti isi
-            maxWidth = (resources.displayMetrics.widthPixels * 0.75f).toInt()
-            visibility = View.GONE
-        }
+        // pet di window-nya sendiri (kecil, fixed) — supaya gerak/drag mulus
         root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER_HORIZONTAL
-            addView(bubble)
             addView(pet)
         }
 
@@ -142,6 +131,34 @@ class PetOverlayService : Service() {
             y = petY
         }
         posX = lp.x.toFloat()
+
+        // gelembung bicara: window TERPISAH yang melebar dinamis mengikuti teks
+        bubble = TextView(this).apply {
+            setTextColor(Color.parseColor("#3E2723"))
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 15f)
+            background = GradientDrawable().apply {
+                setColor(Color.WHITE)
+                cornerRadius = dp(14f)
+                setStroke(3, Color.parseColor("#33334D"))
+            }
+            val px = dp(12f).toInt(); val py = dp(9f).toInt()
+            setPadding(px, py, px, py)
+            elevation = dp(6f)
+        }
+        bubbleLp = WindowManager.LayoutParams(
+            WindowManager.LayoutParams.WRAP_CONTENT, // lebar mengikuti isi
+            WindowManager.LayoutParams.WRAP_CONTENT,
+            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
+                WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED,
+            PixelFormat.TRANSLUCENT
+        ).apply {
+            gravity = Gravity.TOP or Gravity.START
+            // batasi lebar maksimum ke 78% layar; teks panjang otomatis wrap ke bawah
+            width = (resources.displayMetrics.widthPixels * 0.78f).toInt()
+        }
+        bubble.maxWidth = bubbleLp.width
 
         applyScale(addToWindow = true)
         attachTouch()
@@ -187,6 +204,7 @@ class PetOverlayService : Service() {
                         lp.x = startX + dx.toInt()
                         lp.y = startY + dy.toInt()
                         wm.updateViewLayout(root, lp)
+                        if (bubbleShown) positionBubble()
                     }
                     true
                 }
@@ -366,6 +384,7 @@ class PetOverlayService : Service() {
                     if (lp.x != posX.toInt()) {
                         lp.x = posX.toInt()
                         runCatching { wm.updateViewLayout(root, lp) }
+                        if (bubbleShown) positionBubble()
                     }
                 }
             } else {
@@ -440,26 +459,36 @@ class PetOverlayService : Service() {
     private fun say(text: String, emotion: PetView.Emotion?) {
         emotion?.let { pet.emotion = it }
         bubble.text = text
-        bubble.visibility = View.VISIBLE
+        if (!bubbleShown) {
+            runCatching { wm.addView(bubble, bubbleLp) }
+            bubbleShown = true
+        }
+        positionBubble()
         handler.removeCallbacks(hideBubble)
-        // durasi baca menyesuaikan panjang teks (6–30 detik)
-        val duration = (6_000L + text.length * 55L).coerceAtMost(30_000L)
+        // durasi baca menyesuaikan panjang teks (6–40 detik), proporsional jumlah kata
+        val duration = (5_000L + text.length * 70L).coerceIn(6_000L, 40_000L)
         handler.postDelayed(hideBubble, duration)
-        // berhenti jalan selama bicara — jalan + resize window bersamaan bikin flicker
+        // berhenti jalan selama bicara biar enak dibaca
         pausedUntil = maxOf(pausedUntil,
             System.currentTimeMillis() + duration.coerceAtMost(12_000L))
-        // geser pet kalau gelembung melebihi tepi layar
-        root.post {
-            val maxX = resources.displayMetrics.widthPixels - root.width
-            if (lp.x > maxX && maxX >= 0) {
-                lp.x = maxX
-                posX = lp.x.toFloat()
-                runCatching { wm.updateViewLayout(root, lp) }
-            }
+    }
+
+    /** Tempatkan gelembung tepat di atas pet, ditahan dalam batas layar. */
+    private fun positionBubble() {
+        bubble.post {
+            val screenW = resources.displayMetrics.widthPixels
+            val bw = bubble.width.coerceAtLeast(1)
+            val bh = bubble.height
+            val petCenterX = lp.x + pet.width / 2
+            bubbleLp.x = (petCenterX - bw / 2).coerceIn(dp(4f).toInt(), screenW - bw - dp(4f).toInt())
+            bubbleLp.y = (lp.y - bh - dp(6f).toInt()).coerceAtLeast(dp(24f).toInt())
+            if (bubbleShown) runCatching { wm.updateViewLayout(bubble, bubbleLp) }
         }
     }
 
-    private val hideBubble = Runnable { bubble.visibility = View.GONE }
+    private val hideBubble = Runnable {
+        if (bubbleShown) { runCatching { wm.removeView(bubble) }; bubbleShown = false }
+    }
 
     // ---------------------------------------------------------------- foreground
 

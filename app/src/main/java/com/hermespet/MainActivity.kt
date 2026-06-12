@@ -35,6 +35,43 @@ import com.hermespet.Prefs.soulMd
 class MainActivity : Activity() {
 
     private lateinit var status: TextView
+    private lateinit var permPanel: LinearLayout
+    private var guiding = false
+
+    private fun grantAll() {
+        guiding = true
+        val needRuntime = Permissions.run {
+            // ada izin runtime yang belum? minta sekaligus
+            status(this@MainActivity).any { !it.granted }
+        }
+        Permissions.requestRuntime(this, 100)
+        // kalau tidak ada dialog runtime yang muncul, langsung lanjut ke akses khusus
+        if (!needRuntime || Permissions.pendingSpecial(this).isNotEmpty()) {
+            permPanel.postDelayed({ openNextSpecial() }, 300)
+        }
+    }
+
+    private fun openNextSpecial() {
+        if (!guiding) return
+        val next = Permissions.pendingSpecial(this).firstOrNull()
+        if (next == null) {
+            guiding = false
+            android.widget.Toast.makeText(this, "Semua izin sudah diatur 🎉",
+                android.widget.Toast.LENGTH_SHORT).show()
+            return
+        }
+        android.widget.Toast.makeText(this, "Izinkan: ${next.first}",
+            android.widget.Toast.LENGTH_SHORT).show()
+        runCatching { startActivity(next.second) }
+    }
+
+    override fun onRequestPermissionsResult(
+        requestCode: Int, permissions: Array<out String>, grantResults: IntArray
+    ) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        refreshStatus()
+        if (guiding) permPanel.postDelayed({ openNextSpecial() }, 300)
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -50,61 +87,11 @@ class MainActivity : Activity() {
         status = TextView(this).apply { setPadding(0, pad / 2, 0, pad) }
         col.addView(status)
 
-        // --- izin ---
+        // --- izin (satu tombol + status) ---
         col.addView(section("1. Izin"))
-        col.addView(button("Izin tampil di atas aplikasi (overlay)") {
-            startActivity(
-                Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:$packageName"))
-            )
-        })
-        col.addView(button("Izin baca notifikasi") {
-            startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
-        })
-        col.addView(button("Izin kamera (untuk cek mood)") {
-            requestPermissions(arrayOf(Manifest.permission.CAMERA), 1)
-        })
-        if (Build.VERSION.SDK_INT >= 33) {
-            col.addView(button("Izin notifikasi aplikasi") {
-                requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 2)
-            })
-        }
-        col.addView(button("Izin lokasi (cuaca otomatis ikut posisimu)") {
-            requestPermissions(arrayOf(
-                Manifest.permission.ACCESS_COARSE_LOCATION,
-                Manifest.permission.ACCESS_FINE_LOCATION
-            ), 3)
-        })
-        if (Build.VERSION.SDK_INT >= 29) {
-            col.addView(button("Izin aktivitas (hitung langkahmu)") {
-                requestPermissions(arrayOf(Manifest.permission.ACTIVITY_RECOGNITION), 4)
-            })
-        }
-        col.addView(button("Izin kalender (pengingat acara)") {
-            requestPermissions(arrayOf(Manifest.permission.READ_CALENDAR), 5)
-        })
-        col.addView(button("Izin mikrofon (perintah suara — double-tap pet)") {
-            requestPermissions(arrayOf(Manifest.permission.RECORD_AUDIO), 6)
-        })
-        col.addView(button("Izin ubah setelan sistem (atur kecerahan)") {
-            startActivity(Intent(Settings.ACTION_MANAGE_WRITE_SETTINGS,
-                Uri.parse("package:$packageName")))
-        })
-        col.addView(button("Izin semua file (catatan ke storage)") {
-            if (Build.VERSION.SDK_INT >= 30) {
-                startActivity(Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION,
-                    Uri.parse("package:$packageName")))
-            } else {
-                requestPermissions(arrayOf(Manifest.permission.WRITE_EXTERNAL_STORAGE), 7)
-            }
-        })
-        col.addView(button("Akses Jangan Ganggu (DND)") {
-            startActivity(Intent(Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS))
-        })
-        col.addView(button("Abaikan optimasi baterai (pet tidak dibunuh sistem)") {
-            @Suppress("BatteryLife")
-            startActivity(Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
-                Uri.parse("package:$packageName")))
-        })
+        col.addView(button("✨ Berikan semua izin (1 tombol)") { grantAll() })
+        permPanel = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        col.addView(permPanel)
 
         // --- koneksi otak ---
         col.addView(section("2. Otak (model Hermes)"))
@@ -250,22 +237,33 @@ class MainActivity : Activity() {
     override fun onResume() {
         super.onResume()
         refreshStatus()
+        // melanjutkan panduan izin saat kembali dari layar setelan
+        if (guiding) permPanel.postDelayed({ openNextSpecial() }, 400)
     }
 
     private fun refreshStatus() {
-        val overlay = if (Settings.canDrawOverlays(this)) "✅" else "❌"
-        val cam = if (checkSelfPermission(Manifest.permission.CAMERA) ==
-            PackageManager.PERMISSION_GRANTED) "✅" else "❌"
-        val notif = if (isNotifListenerEnabled()) "✅" else "❌"
+        val perms = Permissions.status(this)
         val running = if (PetOverlayService.instance != null) "✅ aktif" else "⏸ mati"
-        status.text = "Overlay $overlay   Kamera $cam   Notifikasi $notif\nPet: $running"
-    }
+        val notGreen = perms.count { !it.granted }
+        status.text = if (notGreen == 0) "Semua izin hijau ✅   Pet: $running"
+            else "$notGreen izin belum aktif ⚠️   Pet: $running"
 
-    private fun isNotifListenerEnabled(): Boolean {
-        val flat = Settings.Secure.getString(contentResolver, "enabled_notification_listeners")
-            ?: return false
-        val cn = ComponentName(this, NotifListener::class.java)
-        return flat.split(":").any { ComponentName.unflattenFromString(it) == cn }
+        if (!::permPanel.isInitialized) return
+        permPanel.removeAllViews()
+        perms.filter { !it.granted }.forEach { p ->
+            permPanel.addView(TextView(this).apply {
+                text = "❌ ${p.label}" + if (p.essential) "  (penting)" else ""
+                setTextColor(android.graphics.Color.parseColor(
+                    if (p.essential) "#C62828" else "#EF6C00"))
+                setPadding(0, 6, 0, 6)
+            })
+        }
+        val granted = perms.count { it.granted }
+        permPanel.addView(TextView(this).apply {
+            text = "✅ $granted/${perms.size} izin aktif"
+            setTextColor(android.graphics.Color.parseColor("#2E7D32"))
+            setPadding(0, 8, 0, 6)
+        })
     }
 
     private fun toastStatus(msg: String) {

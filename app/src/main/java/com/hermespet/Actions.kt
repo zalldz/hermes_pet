@@ -29,6 +29,9 @@ object Actions {
             "brightness" -> brightness(ctx, action.optInt("level", 50))
             "media" -> media(ctx, action.optString("cmd", "play_pause"))
             "open_app" -> openApp(ctx, action.optString("name"))
+            "open_url" -> openUrl(ctx, action.optString("url"))
+            "web_search" -> webSearch(ctx, action.optString("query"))
+            "whatsapp" -> whatsapp(ctx, action.optString("number"), action.optString("text"))
             "wifi_panel" -> wifiPanel(ctx)
             "bluetooth_panel" -> openSettings(ctx, Settings.ACTION_BLUETOOTH_SETTINGS,
                 "Kubukakan setelan Bluetooth 📡")
@@ -134,6 +137,34 @@ object Actions {
             return "Kubukakan $label 🚀"
         }
         return "Gagal membuka $label 😖"
+    }
+
+    private fun openUrl(ctx: Context, url: String): String {
+        if (url.isBlank()) return "URL-nya mana? 🤔"
+        val full = if (url.startsWith("http")) url else "https://$url"
+        ctx.startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse(full))
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        return "Kubukakan $full 🌐"
+    }
+
+    private fun webSearch(ctx: Context, query: String): String {
+        if (query.isBlank()) return "Mau cari apa? 🔍"
+        val url = "https://www.google.com/search?q=" + android.net.Uri.encode(query)
+        ctx.startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse(url))
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        return "Kucarikan \"$query\" di browser 🔍"
+    }
+
+    /** Buka chat WhatsApp ke nomor dengan teks siap kirim (user tinggal tap kirim). */
+    private fun whatsapp(ctx: Context, number: String, text: String): String {
+        val num = number.filter { it.isDigit() }
+        val uri = if (num.isNotEmpty())
+            "https://wa.me/$num?text=" + android.net.Uri.encode(text)
+        else
+            "https://wa.me/?text=" + android.net.Uri.encode(text)
+        ctx.startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse(uri))
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        return "Kubukakan WhatsApp dengan pesan siap kirim 💬 (tinggal kamu tap kirim)"
     }
 
     private fun wifiPanel(ctx: Context): String {

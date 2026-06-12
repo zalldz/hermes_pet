@@ -62,6 +62,10 @@ object Brain {
             "{\"type\":\"brightness\",\"level\":0-100} (kecerahan layar) | " +
             "{\"type\":\"media\",\"cmd\":\"play_pause|next|prev\"} (kontrol musik) | " +
             "{\"type\":\"open_app\",\"name\":\"<nama aplikasi>\"} | " +
+            "{\"type\":\"open_url\",\"url\":\"<alamat web>\"} | " +
+            "{\"type\":\"web_search\",\"query\":\"<kata kunci>\"} (buka hasil pencarian di browser) | " +
+            "{\"type\":\"whatsapp\",\"number\":\"<nomor, kosongkan jika tak tahu>\",\"text\":\"<pesan>\"} " +
+            "(buka WhatsApp dengan pesan siap kirim) | " +
             "{\"type\":\"wifi_panel\"} | {\"type\":\"bluetooth_panel\"} | " +
             "{\"type\":\"dnd\",\"on\":true/false} (mode Jangan Ganggu) | " +
             "{\"type\":\"set_alarm\",\"hour\":0-23,\"minute\":0-59,\"label\":\"<judul>\"} | " +
@@ -78,6 +82,11 @@ object Brain {
             "orang penting) dengan \"remember\" tanpa diminta. Kalau pemilik meminta " +
             "kombinasi aksi yang sama berulang (mis. \"mode tidur\"), tawarkan/buatkan " +
             "skill supaya lain kali cukup sekali perintah.\n" +
+            "Soal informasi: kalau pemilik menanyakan hal yang kamu sudah tahu, jawab " +
+            "langsung di \"say\" — jangan buka browser untuk hal sepele. Pakai " +
+            "\"web_search\" hanya kalau butuh info terkini/spesifik yang tidak kamu " +
+            "ketahui (harga, berita, jadwal). Untuk WhatsApp kamu hanya bisa menyiapkan " +
+            "pesan siap kirim (Android melarang kirim otomatis); jelaskan itu santai.\n" +
             "Catatan: WiFi/Bluetooth hanya bisa kamu bukakan panelnya (aturan Android), " +
             "jelaskan itu dengan santai kalau diminta toggle."
 
