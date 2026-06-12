@@ -9,9 +9,10 @@ import kotlin.math.sin
 import kotlin.random.Random
 
 /**
- * Tubuh pet: karakter pixel-art 8-bit kawaii (sprite 16x16 digambar per piksel,
- * tanpa asset gambar). Pinky pastel berkuping, mata besar berkilau, pipi merona,
- * bob naik-turun saat berjalan ala game retro.
+ * Tubuh pet: slime pixel-art 16x16 terinspirasi slime Stardew Valley —
+ * badan lebar gepeng, antena berbola di kepala, mata besar gelap, gradasi
+ * terang di atas / gelap di bawah — plus pipi merona biar kawaii.
+ * Digambar per piksel tanpa anti-alias (tajam khas game retro).
  */
 class PetView(context: Context) : View(context) {
 
@@ -26,33 +27,35 @@ class PetView(context: Context) : View(context) {
     /** -1 = menghadap kiri, 1 = menghadap kanan */
     var facing: Int = 1
 
-    // sprite dasar 16x16: '.'=transparan, O=outline, B=badan, L=kilau
+    // sprite dasar 16x16: '.'=transparan, O=outline, B=badan,
+    // L=kilau terang, S=bayangan gelap. Baris 0-2 = antena berbola.
     private val base = arrayOf(
-        "....OO....OO....",
-        "...OBBO..OBBO...",
-        "..OBBBBOOBBBBO..",
-        ".OBBBBBBBBBBBBO.",
-        ".OBLLBBBBBBBBBO.",
-        "OBBLBBBBBBBBBBBO",
-        "OBBBBBBBBBBBBBBO",
-        "OBBBBBBBBBBBBBBO",
-        "OBBBBBBBBBBBBBBO",
-        "OBBBBBBBBBBBBBBO",
-        "OBBBBBBBBBBBBBBO",
-        ".OBBBBBBBBBBBBO.",
-        ".OBBBBBBBBBBBBO.",
-        "..OBBBBBBBBBBO..",
-        "...OBBBBBBBBO...",
+        ".......OO.......",
+        "......OBBO......",
+        ".......OO.......",
         "....OOOOOOOO....",
+        "..OOBLLBBBBBOO..",
+        ".OBLLBBBBBBBBBO.",
+        ".OBLBBBBBBBBBBO.",
+        "OBBBBBBBBBBBBBBO",
+        "OBBBBBBBBBBBBBBO",
+        "OBBBBBBBBBBBBBBO",
+        "OBBBBBBBBBBBBSBO",
+        "OBBBBBBBBBBSSSBO",
+        ".OSBBBBBBSSSSSO.",
+        ".OSSSSSSSSSSSSO.",
+        "..OOOOOOOOOOOO..",
+        "................",
     )
 
     // piksel tajam: TANPA anti-alias, khas 8-bit
     private fun crisp(c: String) = Paint().apply { color = Color.parseColor(c) }
 
-    private val outline = crisp("#5D4157")
-    private val body = crisp("#FFD1DC")
-    private val light = crisp("#FFEAF1")
-    private val eye = crisp("#3A2E39")
+    private val outline = crisp("#2B4A23")
+    private val body = crisp("#7EDB63")
+    private val light = crisp("#B6F09C")
+    private val shade = crisp("#4FA63E")
+    private val eye = crisp("#2A2A35")
     private val white = crisp("#FFFFFF")
     private val blush = crisp("#FF9EB5")
     private val heart = crisp("#FF5D8F")
@@ -121,25 +124,24 @@ class PetView(context: Context) : View(context) {
                     'O' -> px(canvas, c, r, outline)
                     'B' -> px(canvas, c, r, body)
                     'L' -> px(canvas, c, r, light)
+                    'S' -> px(canvas, c, r, shade)
                 }
             }
         }
 
-        // mata
+        // mata besar khas slime Stardew (2x4) dengan kilau putih
         val sleepy = emotion == Emotion.SLEEPY
         when {
             blink || sleepy -> {
-                // mata terpejam: garis datar
-                px(canvas, 4, 7, eye); px(canvas, 5, 7, eye)
-                px(canvas, 10, 7, eye); px(canvas, 11, 7, eye)
+                px(canvas, 4, 8, eye); px(canvas, 5, 8, eye)
+                px(canvas, 10, 8, eye); px(canvas, 11, 8, eye)
             }
             emotion == Emotion.LOVE -> {
                 drawPixelHeart(canvas, 3, 6)
                 drawPixelHeart(canvas, 10, 6)
             }
             else -> {
-                // mata 2x3 dengan kilau putih
-                for (r in 6..8) {
+                for (r in 6..9) {
                     px(canvas, 4, r, eye); px(canvas, 5, r, eye)
                     px(canvas, 10, r, eye); px(canvas, 11, r, eye)
                 }
@@ -149,17 +151,17 @@ class PetView(context: Context) : View(context) {
         }
 
         // pipi merona
-        px(canvas, 2, 9, blush); px(canvas, 3, 9, blush)
-        px(canvas, 12, 9, blush); px(canvas, 13, 9, blush)
+        px(canvas, 2, 10, blush); px(canvas, 3, 10, blush)
+        px(canvas, 12, 10, blush); px(canvas, 13, 10, blush)
 
         // mulut + aksesori emosi
         when (emotion) {
             Emotion.HAPPY, Emotion.LOVE -> { // senyum U
-                px(canvas, 6, 9, eye); px(canvas, 9, 9, eye)
-                px(canvas, 7, 10, eye); px(canvas, 8, 10, eye)
+                px(canvas, 6, 10, eye); px(canvas, 9, 10, eye)
+                px(canvas, 7, 11, eye); px(canvas, 8, 11, eye)
             }
             Emotion.NEUTRAL -> {
-                px(canvas, 7, 10, eye); px(canvas, 8, 10, eye)
+                px(canvas, 7, 11, eye); px(canvas, 8, 11, eye)
             }
             Emotion.SAD -> { // cemberut ∩ + air mata
                 px(canvas, 7, 10, eye); px(canvas, 8, 10, eye)
@@ -167,11 +169,11 @@ class PetView(context: Context) : View(context) {
                 px(canvas, 12, 8, tear); px(canvas, 12, 9, tear)
             }
             Emotion.SURPRISED -> { // mulut o 2x2
-                px(canvas, 7, 9, eye); px(canvas, 8, 9, eye)
                 px(canvas, 7, 10, eye); px(canvas, 8, 10, eye)
+                px(canvas, 7, 11, eye); px(canvas, 8, 11, eye)
             }
             Emotion.SLEEPY -> { // mulut kecil + Z melayang
-                px(canvas, 7, 10, eye)
+                px(canvas, 7, 11, eye)
                 px(canvas, 12, 1, eye); px(canvas, 13, 1, eye); px(canvas, 14, 1, eye)
                 px(canvas, 13, 2, eye)
                 px(canvas, 12, 3, eye); px(canvas, 13, 3, eye); px(canvas, 14, 3, eye)
