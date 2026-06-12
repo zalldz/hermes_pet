@@ -23,6 +23,7 @@ import com.hermespet.Prefs.apiBaseUrl
 import com.hermespet.Prefs.apiKey
 import com.hermespet.Prefs.apiModel
 import com.hermespet.Prefs.brainMode
+import com.hermespet.Prefs.embModel
 import com.hermespet.Prefs.latitude
 import com.hermespet.Prefs.longitude
 import com.hermespet.Prefs.moodCheckEnabled
@@ -113,6 +114,15 @@ class MainActivity : Activity() {
         val baseInput = EditText(this).apply { setText(apiBaseUrl) }
         col.addView(baseInput)
 
+        col.addView(TextView(this).apply {
+            text = "Model embeddings — memori vektor (opsional, kosong = kata kunci):"
+        })
+        val embInput = EditText(this).apply {
+            setText(embModel)
+            hint = "mis. text-embedding-3-small"
+        }
+        col.addView(embInput)
+
         col.addView(TextView(this).apply { text = "Lokasi untuk cuaca (lat, lon):" })
         val latInput = EditText(this).apply { setText(latitude); hint = "-6.2" }
         val lonInput = EditText(this).apply { setText(longitude); hint = "106.8" }
@@ -147,6 +157,7 @@ class MainActivity : Activity() {
             apiKey = keyInput.text.toString().trim()
             apiModel = modelInput.text.toString().trim()
             apiBaseUrl = baseInput.text.toString().trim()
+            embModel = embInput.text.toString().trim()
             latitude = latInput.text.toString().trim()
             longitude = lonInput.text.toString().trim()
             agentUrl = urlInput.text.toString().trim()

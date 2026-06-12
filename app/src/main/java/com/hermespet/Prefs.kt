@@ -29,6 +29,11 @@ object Prefs {
         get() = sp(this).getString("api_model", "Hermes-4-405B") ?: "Hermes-4-405B"
         set(v) = sp(this).edit().putString("api_model", v).apply()
 
+    /** Model embeddings untuk memori vektor (kosong = fallback kata kunci). */
+    var Context.embModel: String
+        get() = sp(this).getString("emb_model", "") ?: ""
+        set(v) = sp(this).edit().putString("emb_model", v).apply()
+
     var Context.latitude: String
         get() = sp(this).getString("lat", "-6.2") ?: "-6.2"
         set(v) = sp(this).edit().putString("lat", v).apply()

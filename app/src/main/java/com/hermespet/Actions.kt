@@ -32,6 +32,16 @@ object Actions {
             "wifi_panel" -> wifiPanel(ctx)
             "bluetooth_panel" -> openSettings(ctx, Settings.ACTION_BLUETOOTH_SETTINGS,
                 "Kubukakan setelan Bluetooth 📡")
+            "remember" -> {
+                Memory.remember(ctx, action.optString("text"),
+                    action.optDouble("importance", 0.6))
+                "Oke, kuingat itu 🧠"
+            }
+            "save_skill" -> Skills.save(ctx, action.optString("name"),
+                action.optString("description"),
+                action.optJSONArray("steps") ?: org.json.JSONArray())
+            "use_skill" -> Skills.run(ctx, action.optString("name"))
+            "delete_skill" -> Skills.delete(ctx, action.optString("name"))
             else -> null
         }
     } catch (e: Exception) {

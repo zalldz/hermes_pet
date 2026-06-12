@@ -62,7 +62,17 @@ object Brain {
             "{\"type\":\"brightness\",\"level\":0-100} (kecerahan layar) | " +
             "{\"type\":\"media\",\"cmd\":\"play_pause|next|prev\"} (kontrol musik) | " +
             "{\"type\":\"open_app\",\"name\":\"<nama aplikasi>\"} | " +
-            "{\"type\":\"wifi_panel\"} | {\"type\":\"bluetooth_panel\"}\n" +
+            "{\"type\":\"wifi_panel\"} | {\"type\":\"bluetooth_panel\"} | " +
+            "{\"type\":\"remember\",\"text\":\"<fakta penting>\",\"importance\":0.1-1.0} " +
+            "(simpan ke memori jangka panjangmu) | " +
+            "{\"type\":\"save_skill\",\"name\":\"<nama>\",\"description\":\"<deskripsi>\"," +
+            "\"steps\":[<daftar action di atas>]} (ciptakan skill/makro baru untukmu sendiri) | " +
+            "{\"type\":\"use_skill\",\"name\":\"<nama>\"} | {\"type\":\"delete_skill\",\"name\":\"<nama>\"}\n" +
+            "Skill yang sudah kamu kuasai: " + Skills.listForPrompt(ctx) + "\n" +
+            "Kebiasaanmu: simpan fakta penting tentang pemilik (preferensi, rencana, " +
+            "orang penting) dengan \"remember\" tanpa diminta. Kalau pemilik meminta " +
+            "kombinasi aksi yang sama berulang (mis. \"mode tidur\"), tawarkan/buatkan " +
+            "skill supaya lain kali cukup sekali perintah.\n" +
             "Catatan: WiFi/Bluetooth hanya bisa kamu bukakan panelnya (aturan Android), " +
             "jelaskan itu dengan santai kalau diminta toggle."
 
@@ -164,16 +174,22 @@ object Brain {
             "Percakapan kalian sebelumnya:\n" + chatHistory.joinToString("\n") {
                 "Pemilik: ${it.first}\nKamu: ${it.second}"
             } + "\n\n"
-        askHermes(ctx,
-            history + "Pemilikmu berkata kepadamu: \"$text\". Jawab dengan hangat dan " +
-                "membantu — untuk chat boleh menjawab panjang secukupnya, jangan dipotong.",
-            "Aku dengar kamu! Tapi isi API key dulu di pengaturan biar aku bisa mikir 🥺",
-            "love") { reply ->
-            reply?.optString("say")?.takeIf { it.isNotEmpty() }?.let { said ->
-                chatHistory.addLast(text to said.take(300))
-                while (chatHistory.size > 6) chatHistory.removeFirst()
+        // memori jangka panjang (vektor/kata kunci) yang relevan dengan ucapan ini
+        Memory.recall(ctx, text, 3) { mems ->
+            val memCtx = if (mems.isEmpty()) "" else
+                "Ingatan jangka panjangmu yang relevan:\n- " + mems.joinToString("\n- ") + "\n\n"
+            askHermes(ctx,
+                memCtx + history + "Pemilikmu berkata kepadamu: \"$text\". Jawab dengan " +
+                    "hangat dan membantu — untuk chat boleh menjawab panjang secukupnya, " +
+                    "jangan dipotong.",
+                "Aku dengar kamu! Tapi isi API key dulu di pengaturan biar aku bisa mikir 🥺",
+                "love") { reply ->
+                reply?.optString("say")?.takeIf { it.isNotEmpty() }?.let { said ->
+                    chatHistory.addLast(text to said.take(300))
+                    while (chatHistory.size > 6) chatHistory.removeFirst()
+                }
+                onReply(reply)
             }
-            onReply(reply)
         }
     }
 
