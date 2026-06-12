@@ -169,7 +169,7 @@ class PetOverlayService : Service() {
             elevation = dp(6f)
         }
         bubbleLp = WindowManager.LayoutParams(
-            WindowManager.LayoutParams.WRAP_CONTENT, // lebar mengikuti isi
+            WindowManager.LayoutParams.WRAP_CONTENT, // lebar window ikut isi (dinamis)
             WindowManager.LayoutParams.WRAP_CONTENT,
             WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
@@ -178,10 +178,10 @@ class PetOverlayService : Service() {
             PixelFormat.TRANSLUCENT
         ).apply {
             gravity = Gravity.TOP or Gravity.START
-            // batasi lebar maksimum ke 78% layar; teks panjang otomatis wrap ke bawah
-            width = (resources.displayMetrics.widthPixels * 0.78f).toInt()
         }
-        bubble.maxWidth = bubbleLp.width
+        // hanya BATAS maksimum teks (78% layar) — teks pendek = gelembung kecil,
+        // teks panjang melebar sampai batas lalu turun ke bawah
+        bubble.maxWidth = (resources.displayMetrics.widthPixels * 0.78f).toInt()
 
         applyScale(addToWindow = true)
         attachTouch()
@@ -515,11 +515,22 @@ class PetOverlayService : Service() {
     private fun say(text: String, emotion: PetView.Emotion?) {
         emotion?.let { pet.emotion = it }
         bubble.text = text
-        if (!bubbleShown) {
+        val firstShow = !bubbleShown
+        if (firstShow) {
             runCatching { wm.addView(bubble, bubbleLp) }
             bubbleShown = true
         }
         positionBubble()
+        if (firstShow) {
+            bubble.alpha = 0f
+            bubble.post {
+                // animasi "pop" muncul: membesar dari kecil (titik tumpu di bawah, ke arah pet)
+                bubble.pivotY = bubble.height.toFloat()
+                bubble.pivotX = bubble.width / 2f
+                bubble.scaleX = 0.6f; bubble.scaleY = 0.6f
+                bubble.animate().scaleX(1f).scaleY(1f).alpha(1f).setDuration(180).start()
+            }
+        }
         handler.removeCallbacks(hideBubble)
         // durasi baca menyesuaikan panjang teks (6–40 detik), proporsional jumlah kata
         val duration = (5_000L + text.length * 70L).coerceIn(6_000L, 40_000L)
@@ -543,7 +554,11 @@ class PetOverlayService : Service() {
     }
 
     private val hideBubble = Runnable {
-        if (bubbleShown) { runCatching { wm.removeView(bubble) }; bubbleShown = false }
+        if (!bubbleShown) return@Runnable
+        bubble.animate().alpha(0f).scaleX(0.7f).scaleY(0.7f).setDuration(160)
+            .withEndAction {
+                if (bubbleShown) { runCatching { wm.removeView(bubble) }; bubbleShown = false }
+            }.start()
     }
 
     // ---------------------------------------------------------------- foreground
