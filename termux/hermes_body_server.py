@@ -30,6 +30,15 @@ import time
 import requests
 from flask import Flask, jsonify, request
 
+# Memori jangka panjang opsional via Mnemosyne (https://mnemosyne.site)
+#   pip install mnemosyne-memory
+#   (atau integrasikan langsung ke hermes-agent: python -m mnemosyne.install)
+try:
+    from mnemosyne import remember, recall  # type: ignore
+    print("mnemosyne: memori jangka panjang AKTIF")
+except Exception:
+    remember = recall = None
+
 app = Flask(__name__)
 
 # ---------------------------------------------------------------- konfigurasi
@@ -180,11 +189,26 @@ def handle_poke(_data):
 
 def handle_chat(data):
     text = data.get("text", "")[:500]
-    return hermes_reply(
-        f"Pemilikmu berkata kepadamu: '{text}'. Jawab hangat, membantu, singkat.",
+    mem_ctx = ""
+    if recall:
+        try:
+            mems = [m.get("content", "") for m in (recall(text) or [])[:3] if isinstance(m, dict)]
+            if mems:
+                mem_ctx = "(Ingatan relevanmu: " + "; ".join(mems) + ") "
+        except Exception as e:
+            print("mnemosyne recall:", e)
+    reply = hermes_reply(
+        f"{mem_ctx}Pemilikmu berkata kepadamu: '{text}'. Jawab hangat, membantu.",
         "Aku dengar kamu! Tapi HERMES_CMD belum di-set, jadi aku belum bisa mikir 🥺",
         "love",
     )
+    if remember:
+        try:
+            remember(f"Pemilik berkata: {text} | Pet menjawab: {reply.get('say', '')}",
+                     importance=0.5)
+        except Exception as e:
+            print("mnemosyne remember:", e)
+    return reply
 
 
 HANDLERS = {

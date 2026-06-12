@@ -133,7 +133,8 @@ class PetOverlayService : Service() {
             WindowManager.LayoutParams.WRAP_CONTENT,
             WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
-                WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL,
+                WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
+                WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED, // anti-flicker
             PixelFormat.TRANSLUCENT
         ).apply {
             gravity = Gravity.TOP or Gravity.START
@@ -254,6 +255,7 @@ class PetOverlayService : Service() {
             val text = input.text.toString().trim()
             closeChat()
             if (text.isNotEmpty()) {
+                PetLog.add(this, "user", text)
                 say("🤔...", null)
                 sendToBrain("chat", JSONObject().put("text", text))
             }
@@ -314,6 +316,7 @@ class PetOverlayService : Service() {
                     ?.firstOrNull()
                 sr.destroy()
                 if (!text.isNullOrBlank()) {
+                    PetLog.add(this@PetOverlayService, "user", "🎤 $text")
                     say("「$text」🤔...", null)
                     sendToBrain("chat", JSONObject().put("text", text).put("via", "voice"))
                 } else {
@@ -393,6 +396,9 @@ class PetOverlayService : Service() {
         override fun run() {
             if (moodCheckEnabled && hasCameraPermission()) {
                 MoodCamera.capture(this@PetOverlayService, sendMoodImage) { result ->
+                    PetLog.add(this@PetOverlayService, "mood",
+                        "wajah=${result.optBoolean("face_detected")} " +
+                            "tebakan=${result.optString("mood_guess", "-")}")
                     sendToBrain("mood", result)
                 }
             }
@@ -401,6 +407,7 @@ class PetOverlayService : Service() {
     }
 
     fun onNotificationSeen(pkg: String, title: String, text: String) {
+        PetLog.add(this, "notif", "$pkg: $title — ${text.take(80)}")
         val data = JSONObject().put("package", pkg).put("title", title).put("text", text)
         sendToBrain("notification", data)
     }
@@ -412,15 +419,19 @@ class PetOverlayService : Service() {
             if (emotion.isNotEmpty()) pet.emotion = PetView.emotionFrom(emotion)
             val text = reply.optString("say", "")
             if (text.isNotEmpty()) {
+                PetLog.add(this, "pet", text)
                 say(text, null)
                 speak(text)
             }
             // otak minta aksi nyata (volume, senter, buka app, dll.)
             reply.optJSONObject("action")?.let { act ->
                 val feedback = Actions.run(this, act)
-                if (text.isEmpty() && !feedback.isNullOrEmpty()) {
-                    say(feedback, null)
-                    speak(feedback)
+                if (!feedback.isNullOrEmpty()) {
+                    PetLog.add(this, "aksi", feedback)
+                    if (text.isEmpty()) {
+                        say(feedback, null)
+                        speak(feedback)
+                    }
                 }
             }
         }
@@ -434,6 +445,9 @@ class PetOverlayService : Service() {
         // durasi baca menyesuaikan panjang teks (6–30 detik)
         val duration = (6_000L + text.length * 55L).coerceAtMost(30_000L)
         handler.postDelayed(hideBubble, duration)
+        // berhenti jalan selama bicara — jalan + resize window bersamaan bikin flicker
+        pausedUntil = maxOf(pausedUntil,
+            System.currentTimeMillis() + duration.coerceAtMost(12_000L))
         // geser pet kalau gelembung melebihi tepi layar
         root.post {
             val maxX = resources.displayMetrics.widthPixels - root.width

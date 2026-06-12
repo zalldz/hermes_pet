@@ -198,6 +198,10 @@ class MainActivity : Activity() {
         }
         col.addView(imgSwitch)
 
+        col.addView(button("📜 Riwayat chat & log") {
+            startActivity(Intent(this, LogActivity::class.java))
+        })
+
         // --- start/stop ---
         col.addView(section("4. Jalankan"))
         col.addView(button("▶  Hidupkan pet") {

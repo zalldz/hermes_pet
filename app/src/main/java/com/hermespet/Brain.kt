@@ -155,13 +155,26 @@ object Brain {
             fallback.first, fallback.second, onReply)
     }
 
+    /** Memori percakapan: 6 tukar-kata terakhir disertakan sebagai konteks. */
+    private val chatHistory = ArrayDeque<Pair<String, String>>()
+
     private fun handleChat(ctx: Context, data: JSONObject, onReply: (JSONObject?) -> Unit) {
         val text = data.optString("text").take(500)
+        val history = if (chatHistory.isEmpty()) "" else
+            "Percakapan kalian sebelumnya:\n" + chatHistory.joinToString("\n") {
+                "Pemilik: ${it.first}\nKamu: ${it.second}"
+            } + "\n\n"
         askHermes(ctx,
-            "Pemilikmu berkata kepadamu: \"$text\". Jawab dengan hangat dan membantu — " +
-                "untuk chat boleh menjawab panjang secukupnya, jangan dipotong.",
+            history + "Pemilikmu berkata kepadamu: \"$text\". Jawab dengan hangat dan " +
+                "membantu — untuk chat boleh menjawab panjang secukupnya, jangan dipotong.",
             "Aku dengar kamu! Tapi isi API key dulu di pengaturan biar aku bisa mikir 🥺",
-            "love", onReply)
+            "love") { reply ->
+            reply?.optString("say")?.takeIf { it.isNotEmpty() }?.let { said ->
+                chatHistory.addLast(text to said.take(300))
+                while (chatHistory.size > 6) chatHistory.removeFirst()
+            }
+            onReply(reply)
+        }
     }
 
     private fun handlePoke(ctx: Context, onReply: (JSONObject?) -> Unit) {

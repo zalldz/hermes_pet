@@ -32,6 +32,10 @@
         android:theme="@android:style/Theme.Material.Light">
 
         <activity
+            android:name=".LogActivity"
+            android:exported="false" />
+
+        <activity
             android:name=".MainActivity"
             android:exported="true">
             <intent-filter>
