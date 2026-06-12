@@ -15,9 +15,25 @@ android {
         versionName = "0.1"
     }
 
+    // kunci debug tetap (di-commit) supaya semua build CI bertanda tangan sama
+    // dan update APK tidak pernah minta uninstall
+    signingConfigs {
+        create("shared") {
+            storeFile = rootProject.file("signing/debug-keystore.p12")
+            storePassword = "hermespet"
+            keyAlias = "hermespet"
+            keyPassword = "hermespet"
+            storeType = "PKCS12"
+        }
+    }
+
     buildTypes {
+        debug {
+            signingConfig = signingConfigs.getByName("shared")
+        }
         release {
             isMinifyEnabled = false
+            signingConfig = signingConfigs.getByName("shared")
         }
     }
 
