@@ -42,6 +42,11 @@ object Prefs {
         get() = sp(this).getFloat("pet_scale", 1.0f)
         set(v) = sp(this).edit().putFloat("pet_scale", v.coerceIn(0.5f, 2.5f)).apply()
 
+    /** Pet membacakan ucapannya dengan suara (TTS). */
+    var Context.petVoice: Boolean
+        get() = sp(this).getBoolean("pet_voice", true)
+        set(v) = sp(this).edit().putBoolean("pet_voice", v).apply()
+
     var Context.moodCheckEnabled: Boolean
         get() = sp(this).getBoolean("mood_enabled", false)
         set(v) = sp(this).edit().putBoolean("mood_enabled", v).apply()

@@ -15,9 +15,14 @@ import android.graphics.PixelFormat
 import android.graphics.drawable.GradientDrawable
 import android.os.BatteryManager
 import android.os.Build
+import android.os.Bundle
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
+import android.speech.RecognitionListener
+import android.speech.RecognizerIntent
+import android.speech.SpeechRecognizer
+import android.speech.tts.TextToSpeech
 import android.util.TypedValue
 import android.view.Gravity
 import android.view.MotionEvent
@@ -30,11 +35,13 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import com.hermespet.Prefs.moodCheckEnabled
 import com.hermespet.Prefs.petScale
+import com.hermespet.Prefs.petVoice
 import com.hermespet.Prefs.petX
 import com.hermespet.Prefs.petY
 import com.hermespet.Prefs.sendMoodImage
 import org.json.JSONObject
 import java.util.Calendar
+import java.util.Locale
 import kotlin.math.abs
 import kotlin.random.Random
 
@@ -71,6 +78,9 @@ class PetOverlayService : Service() {
         startAsForeground()
         wm = getSystemService(WINDOW_SERVICE) as WindowManager
         Senses.start(this)
+        tts = TextToSpeech(this) { status ->
+            if (status == TextToSpeech.SUCCESS) tts?.language = Locale("id", "ID")
+        }
         buildOverlay()
         handler.post(walkLoop)
         handler.postDelayed(tickLoop, 5_000)
@@ -87,6 +97,7 @@ class PetOverlayService : Service() {
         instance = null
         handler.removeCallbacksAndMessages(null)
         Senses.stop(this)
+        tts?.shutdown()
         closeChat()
         runCatching { wm.removeView(root) }
         super.onDestroy()
@@ -179,10 +190,19 @@ class PetOverlayService : Service() {
                     true
                 }
                 MotionEvent.ACTION_UP -> {
+                    val now = System.currentTimeMillis()
                     when {
                         dragging -> { petX = lp.x; petY = lp.y; posX = lp.x.toFloat() }
-                        System.currentTimeMillis() - downAt > 400 -> toggleChat() // tahan = ngobrol
-                        else -> onPoked()
+                        now - downAt > 400 -> toggleChat() // tahan = ngobrol via ketik
+                        now - lastTapAt < 350 -> { // double-tap = ngobrol via suara
+                            handler.removeCallbacks(pokeRunnable)
+                            lastTapAt = 0
+                            startVoiceInput()
+                        }
+                        else -> { // tunggu sebentar — bisa jadi tap kedua menyusul
+                            lastTapAt = now
+                            handler.postDelayed(pokeRunnable, 360)
+                        }
                     }
                     true
                 }
@@ -252,9 +272,69 @@ class PetOverlayService : Service() {
         chatView = null
     }
 
+    private var lastTapAt = 0L
+    private val pokeRunnable = Runnable { onPoked() }
+
     private fun onPoked() {
         pet.emotion = PetView.Emotion.SURPRISED
         sendToBrain("poke", JSONObject())
+    }
+
+    // ---------------------------------------------------------------- suara
+
+    private var tts: TextToSpeech? = null
+
+    private fun speak(text: String) {
+        if (!petVoice) return
+        // buang emoji/simbol supaya TTS tidak membacakannya
+        val clean = text.filter { it.code < 0x2190 }.trim()
+        if (clean.isNotEmpty()) tts?.speak(clean, TextToSpeech.QUEUE_FLUSH, null, "hermespet")
+    }
+
+    private fun startVoiceInput() {
+        if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+            say("Kasih aku izin mikrofon dulu ya (di pengaturan) 🥺", PetView.Emotion.SAD)
+            return
+        }
+        if (!SpeechRecognizer.isRecognitionAvailable(this)) {
+            say("HP-mu nggak punya mesin pengenal suara 😞", PetView.Emotion.SAD)
+            return
+        }
+        val sr = SpeechRecognizer.createSpeechRecognizer(this)
+        val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL,
+                RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE, "id-ID")
+        }
+        say("🎤 Aku dengerin...", PetView.Emotion.SURPRISED)
+        sr.setRecognitionListener(object : RecognitionListener {
+            override fun onResults(results: Bundle) {
+                val text = results
+                    .getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
+                    ?.firstOrNull()
+                sr.destroy()
+                if (!text.isNullOrBlank()) {
+                    say("「$text」🤔...", null)
+                    sendToBrain("chat", JSONObject().put("text", text).put("via", "voice"))
+                } else {
+                    say("Aku nggak nangkep, coba lagi 😅", PetView.Emotion.SAD)
+                }
+            }
+
+            override fun onError(error: Int) {
+                sr.destroy()
+                say("Aku nggak denger jelas, coba lagi 😅", PetView.Emotion.SAD)
+            }
+
+            override fun onReadyForSpeech(params: Bundle?) {}
+            override fun onBeginningOfSpeech() {}
+            override fun onRmsChanged(rmsdB: Float) {}
+            override fun onBufferReceived(buffer: ByteArray?) {}
+            override fun onEndOfSpeech() {}
+            override fun onPartialResults(partialResults: Bundle?) {}
+            override fun onEvent(eventType: Int, params: Bundle?) {}
+        })
+        sr.startListening(intent)
     }
 
     // ---------------------------------------------------------------- jalan-jalan
@@ -331,7 +411,18 @@ class PetOverlayService : Service() {
             val emotion = reply.optString("emotion", "")
             if (emotion.isNotEmpty()) pet.emotion = PetView.emotionFrom(emotion)
             val text = reply.optString("say", "")
-            if (text.isNotEmpty()) say(text, null)
+            if (text.isNotEmpty()) {
+                say(text, null)
+                speak(text)
+            }
+            // otak minta aksi nyata (volume, senter, buka app, dll.)
+            reply.optJSONObject("action")?.let { act ->
+                val feedback = Actions.run(this, act)
+                if (text.isEmpty() && !feedback.isNullOrEmpty()) {
+                    say(feedback, null)
+                    speak(feedback)
+                }
+            }
         }
     }
 
@@ -380,6 +471,9 @@ class PetOverlayService : Service() {
         if (Build.VERSION.SDK_INT >= 30) {
             var type = ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
             if (hasCameraPermission()) type = type or ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA
+            if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
+                type = type or ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE
+            }
             startForeground(1, notif, type)
         } else {
             startForeground(1, notif)

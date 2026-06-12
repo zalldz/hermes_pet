@@ -52,8 +52,19 @@ object Brain {
     /** SOUL.md pengguna + aturan format yang tidak boleh dilanggar (untuk parsing). */
     private fun systemPrompt(ctx: Context): String =
         ctx.soulMd + "\n\nFORMAT WAJIB: balas HANYA dengan JSON satu baris: " +
-            "{\"say\": \"<komentar singkat, bahasa Indonesia santai>\", " +
-            "\"emotion\": \"<happy|sad|neutral|sleepy|surprised|love>\"}"
+            "{\"say\": \"<ucapanmu, bahasa Indonesia santai>\", " +
+            "\"emotion\": \"<happy|sad|neutral|sleepy|surprised|love>\"}\n" +
+            "Kamu juga bisa MELAKUKAN aksi di HP. Kalau (dan hanya kalau) pemilik " +
+            "memintanya, tambahkan field \"action\" di JSON, salah satu dari:\n" +
+            "{\"type\":\"volume\",\"level\":0-100} | {\"type\":\"volume_up\"} | " +
+            "{\"type\":\"volume_down\"} | {\"type\":\"mute\"} | " +
+            "{\"type\":\"torch\",\"on\":true/false} (senter) | " +
+            "{\"type\":\"brightness\",\"level\":0-100} (kecerahan layar) | " +
+            "{\"type\":\"media\",\"cmd\":\"play_pause|next|prev\"} (kontrol musik) | " +
+            "{\"type\":\"open_app\",\"name\":\"<nama aplikasi>\"} | " +
+            "{\"type\":\"wifi_panel\"} | {\"type\":\"bluetooth_panel\"}\n" +
+            "Catatan: WiFi/Bluetooth hanya bisa kamu bukakan panelnya (aturan Android), " +
+            "jelaskan itu dengan santai kalau diminta toggle."
 
     fun sendEvent(ctx: Context, type: String, data: JSONObject, onReply: (JSONObject?) -> Unit) {
         if (ctx.brainMode == "termux") {
@@ -214,8 +225,10 @@ object Brain {
         if (start < 0 || end <= start) return null
         return try {
             val obj = JSONObject(text.substring(start, end + 1))
-            if (obj.has("say")) reply(obj.optString("say").take(1500),
-                obj.optString("emotion", "neutral")) else null
+            if (!obj.has("say")) return null
+            val r = reply(obj.optString("say").take(1500), obj.optString("emotion", "neutral"))
+            obj.optJSONObject("action")?.let { r.put("action", it) }
+            r
         } catch (e: Exception) { null }
     }
 

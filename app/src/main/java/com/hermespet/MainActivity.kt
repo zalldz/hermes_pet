@@ -27,6 +27,7 @@ import com.hermespet.Prefs.latitude
 import com.hermespet.Prefs.longitude
 import com.hermespet.Prefs.moodCheckEnabled
 import com.hermespet.Prefs.petScale
+import com.hermespet.Prefs.petVoice
 import com.hermespet.Prefs.sendMoodImage
 import com.hermespet.Prefs.soulMd
 
@@ -79,6 +80,13 @@ class MainActivity : Activity() {
         }
         col.addView(button("Izin kalender (pengingat acara)") {
             requestPermissions(arrayOf(Manifest.permission.READ_CALENDAR), 5)
+        })
+        col.addView(button("Izin mikrofon (perintah suara — double-tap pet)") {
+            requestPermissions(arrayOf(Manifest.permission.RECORD_AUDIO), 6)
+        })
+        col.addView(button("Izin ubah setelan sistem (atur kecerahan)") {
+            startActivity(Intent(Settings.ACTION_MANAGE_WRITE_SETTINGS,
+                Uri.parse("package:$packageName")))
         })
 
         // --- koneksi otak ---
@@ -165,6 +173,14 @@ class MainActivity : Activity() {
                 override fun onStopTrackingTouch(sb: SeekBar?) {}
             })
         })
+
+        @Suppress("UseSwitchCompatOrMaterialCode")
+        val voiceSwitch = Switch(this).apply {
+            text = "Pet bersuara (membacakan ucapannya, TTS)"
+            isChecked = petVoice
+            setOnCheckedChangeListener { _, on -> petVoice = on }
+        }
+        col.addView(voiceSwitch)
 
         @Suppress("UseSwitchCompatOrMaterialCode")
         val moodSwitch = Switch(this).apply {
