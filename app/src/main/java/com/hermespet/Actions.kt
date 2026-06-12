@@ -32,6 +32,12 @@ object Actions {
             "wifi_panel" -> wifiPanel(ctx)
             "bluetooth_panel" -> openSettings(ctx, Settings.ACTION_BLUETOOTH_SETTINGS,
                 "Kubukakan setelan Bluetooth 📡")
+            "dnd" -> dnd(ctx, action.optBoolean("on", true))
+            "set_alarm" -> setAlarm(ctx, action.optInt("hour", 7),
+                action.optInt("minute", 0), action.optString("label", "HermesPet"))
+            "save_note" -> saveNote(ctx, action.optString("filename", "catatan.txt"),
+                action.optString("text"))
+            "read_note" -> readNote(ctx, action.optString("filename", "catatan.txt"))
             "remember" -> {
                 Memory.remember(ctx, action.optString("text"),
                     action.optDouble("importance", 0.6))
@@ -143,5 +149,74 @@ object Actions {
     private fun openSettings(ctx: Context, action: String, feedback: String): String {
         ctx.startActivity(Intent(action).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
         return feedback
+    }
+
+    // ------------------------------------------------------------- jangan ganggu
+
+    private fun dnd(ctx: Context, on: Boolean): String {
+        val nm = ctx.getSystemService(Context.NOTIFICATION_SERVICE)
+            as android.app.NotificationManager
+        if (!nm.isNotificationPolicyAccessGranted) {
+            ctx.startActivity(Intent(Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+            return "Beri aku akses 'Jangan Ganggu' dulu ya (kubukakan halamannya) 🙏"
+        }
+        nm.setInterruptionFilter(
+            if (on) android.app.NotificationManager.INTERRUPTION_FILTER_PRIORITY
+            else android.app.NotificationManager.INTERRUPTION_FILTER_ALL
+        )
+        return if (on) "Mode Jangan Ganggu nyala 🌙" else "Jangan Ganggu kumatikan 🔔"
+    }
+
+    // ------------------------------------------------------------- alarm
+
+    private fun setAlarm(ctx: Context, hour: Int, minute: Int, label: String): String {
+        ctx.startActivity(Intent(android.provider.AlarmClock.ACTION_SET_ALARM).apply {
+            putExtra(android.provider.AlarmClock.EXTRA_HOUR, hour.coerceIn(0, 23))
+            putExtra(android.provider.AlarmClock.EXTRA_MINUTES, minute.coerceIn(0, 59))
+            putExtra(android.provider.AlarmClock.EXTRA_MESSAGE, label)
+            putExtra(android.provider.AlarmClock.EXTRA_SKIP_UI, true)
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        })
+        return "Alarm %02d:%02d (%s) kusetel ⏰".format(hour, minute, label)
+    }
+
+    // ------------------------------------------------------------- catatan (storage)
+
+    private fun storageOk(ctx: Context): Boolean =
+        if (Build.VERSION.SDK_INT >= 30) android.os.Environment.isExternalStorageManager()
+        else ctx.checkSelfPermission(android.Manifest.permission.WRITE_EXTERNAL_STORAGE) ==
+            android.content.pm.PackageManager.PERMISSION_GRANTED
+
+    private fun askStorage(ctx: Context): String {
+        if (Build.VERSION.SDK_INT >= 30) {
+            ctx.startActivity(
+                Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION,
+                    android.net.Uri.parse("package:${ctx.packageName}"))
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        }
+        return "Beri aku izin 'Akses semua file' dulu ya (kubukakan halamannya) 🙏"
+    }
+
+    private fun noteDir(): java.io.File = java.io.File(
+        android.os.Environment.getExternalStoragePublicDirectory(
+            android.os.Environment.DIRECTORY_DOCUMENTS), "HermesPet")
+
+    private fun safeName(filename: String): String =
+        filename.replace(Regex("[^A-Za-z0-9._ -]"), "_").ifBlank { "catatan.txt" }
+
+    private fun saveNote(ctx: Context, filename: String, text: String): String {
+        if (text.isBlank()) return "Catat apa? 🤔"
+        if (!storageOk(ctx)) return askStorage(ctx)
+        val dir = noteDir().apply { mkdirs() }
+        java.io.File(dir, safeName(filename)).appendText(text + "\n")
+        return "Kucatat di Documents/HermesPet/${safeName(filename)} 📝"
+    }
+
+    private fun readNote(ctx: Context, filename: String): String {
+        if (!storageOk(ctx)) return askStorage(ctx)
+        val f = java.io.File(noteDir(), safeName(filename))
+        if (!f.exists()) return "Catatan ${safeName(filename)} belum ada 🤔"
+        return "Isi ${safeName(filename)}:\n" + f.readText().takeLast(1000)
     }
 }

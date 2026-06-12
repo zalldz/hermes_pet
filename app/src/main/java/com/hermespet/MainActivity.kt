@@ -89,6 +89,22 @@ class MainActivity : Activity() {
             startActivity(Intent(Settings.ACTION_MANAGE_WRITE_SETTINGS,
                 Uri.parse("package:$packageName")))
         })
+        col.addView(button("Izin semua file (catatan ke storage)") {
+            if (Build.VERSION.SDK_INT >= 30) {
+                startActivity(Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION,
+                    Uri.parse("package:$packageName")))
+            } else {
+                requestPermissions(arrayOf(Manifest.permission.WRITE_EXTERNAL_STORAGE), 7)
+            }
+        })
+        col.addView(button("Akses Jangan Ganggu (DND)") {
+            startActivity(Intent(Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS))
+        })
+        col.addView(button("Abaikan optimasi baterai (pet tidak dibunuh sistem)") {
+            @Suppress("BatteryLife")
+            startActivity(Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
+                Uri.parse("package:$packageName")))
+        })
 
         // --- koneksi otak ---
         col.addView(section("2. Otak (model Hermes)"))

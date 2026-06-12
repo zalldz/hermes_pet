@@ -63,6 +63,11 @@ object Brain {
             "{\"type\":\"media\",\"cmd\":\"play_pause|next|prev\"} (kontrol musik) | " +
             "{\"type\":\"open_app\",\"name\":\"<nama aplikasi>\"} | " +
             "{\"type\":\"wifi_panel\"} | {\"type\":\"bluetooth_panel\"} | " +
+            "{\"type\":\"dnd\",\"on\":true/false} (mode Jangan Ganggu) | " +
+            "{\"type\":\"set_alarm\",\"hour\":0-23,\"minute\":0-59,\"label\":\"<judul>\"} | " +
+            "{\"type\":\"save_note\",\"filename\":\"<nama>.txt\",\"text\":\"<isi>\"} " +
+            "(catat ke Documents/HermesPet) | " +
+            "{\"type\":\"read_note\",\"filename\":\"<nama>.txt\"} | " +
             "{\"type\":\"remember\",\"text\":\"<fakta penting>\",\"importance\":0.1-1.0} " +
             "(simpan ke memori jangka panjangmu) | " +
             "{\"type\":\"save_skill\",\"name\":\"<nama>\",\"description\":\"<deskripsi>\"," +
