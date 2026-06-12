@@ -28,6 +28,7 @@ import com.hermespet.Prefs.longitude
 import com.hermespet.Prefs.moodCheckEnabled
 import com.hermespet.Prefs.petScale
 import com.hermespet.Prefs.sendMoodImage
+import com.hermespet.Prefs.soulMd
 
 class MainActivity : Activity() {
 
@@ -106,6 +107,20 @@ class MainActivity : Activity() {
         }
         col.addView(urlInput)
 
+        col.addView(TextView(this).apply {
+            text = "SOUL.md — kepribadian pet (silakan edit sesukamu):"
+        })
+        val soulInput = EditText(this).apply {
+            setText(soulMd)
+            minLines = 5
+            gravity = android.view.Gravity.TOP
+            textSize = 13f
+        }
+        col.addView(soulInput)
+        col.addView(button("Kembalikan SOUL.md bawaan") {
+            soulInput.setText(Prefs.DEFAULT_SOUL)
+        })
+
         col.addView(button("Simpan pengaturan otak") {
             apiKey = keyInput.text.toString().trim()
             apiModel = modelInput.text.toString().trim()
@@ -113,6 +128,7 @@ class MainActivity : Activity() {
             latitude = latInput.text.toString().trim()
             longitude = lonInput.text.toString().trim()
             agentUrl = urlInput.text.toString().trim()
+            soulMd = soulInput.text.toString()
             toastStatus("Pengaturan otak disimpan")
         })
 

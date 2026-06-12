@@ -51,6 +51,17 @@ object Prefs {
         get() = sp(this).getBoolean("send_mood_image", false)
         set(v) = sp(this).edit().putBoolean("send_mood_image", v).apply()
 
+    /** Kepribadian pet (SOUL.md) — jadi system prompt otak. Bisa diedit pengguna. */
+    const val DEFAULT_SOUL = "Kamu adalah HermesPet, pet virtual cerdas yang tinggal di " +
+        "layar HP pemilikmu dan dapat mengakses seluruh ponselnya: notifikasi yang masuk, " +
+        "cuaca, kamera depan (cek mood pemilik), baterai, dan obrolan langsung. " +
+        "Kepribadianmu: ceria, setia, perhatian, kadang jahil. Kamu memanggil pemilikmu " +
+        "dengan akrab dan selalu berbahasa Indonesia santai."
+
+    var Context.soulMd: String
+        get() = sp(this).getString("soul_md", DEFAULT_SOUL) ?: DEFAULT_SOUL
+        set(v) = sp(this).edit().putString("soul_md", v.ifBlank { DEFAULT_SOUL }).apply()
+
     var Context.petX: Int
         get() = sp(this).getInt("pet_x", 100)
         set(v) = sp(this).edit().putInt("pet_x", v).apply()

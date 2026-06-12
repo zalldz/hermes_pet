@@ -4,16 +4,14 @@ import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
-import android.graphics.Path
-import android.graphics.RectF
 import android.view.View
 import kotlin.math.sin
 import kotlin.random.Random
 
 /**
- * Tubuh pet: slime kawaii yang digambar di canvas (tanpa asset gambar).
- * Gel mint transparan, kilau glossy, mata besar berbinar, pipi merona,
- * dan animasi squish kenyal saat berjalan.
+ * Tubuh pet: karakter pixel-art 8-bit kawaii (sprite 16x16 digambar per piksel,
+ * tanpa asset gambar). Pinky pastel berkuping, mata besar berkilau, pipi merona,
+ * bob naik-turun saat berjalan ala game retro.
  */
 class PetView(context: Context) : View(context) {
 
@@ -22,40 +20,43 @@ class PetView(context: Context) : View(context) {
     var emotion: Emotion = Emotion.NEUTRAL
         set(v) { field = v; invalidate() }
 
-    /** true saat service sedang menggerakkan pet — memicu squish kenyal */
+    /** true saat service sedang menggerakkan pet — memicu bob 8-bit */
     var walking: Boolean = false
 
     /** -1 = menghadap kiri, 1 = menghadap kanan */
     var facing: Int = 1
 
-    private val body = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.parseColor("#7FE3C9"); alpha = 235
-    }
-    private val bodyShade = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.parseColor("#54C7A8"); alpha = 235
-    }
-    private val gloss = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.WHITE; alpha = 110
-    }
-    private val sparkleWhite = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.WHITE; alpha = 200
-    }
-    private val eye = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#33334D") }
-    private val white = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.WHITE }
-    private val blushP = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.parseColor("#FFA6C9"); alpha = 150
-    }
-    private val stroke = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.parseColor("#33334D"); style = Paint.Style.STROKE
-        strokeWidth = 4f; strokeCap = Paint.Cap.ROUND
-    }
-    private val tearP = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#7EC8E3") }
-    private val heartP = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#FF6B81") }
-    private val zzz = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.parseColor("#33334D"); alpha = 160
-        textSize = 1f // di-set ulang di onDraw sesuai ukuran
-        isFakeBoldText = true
-    }
+    // sprite dasar 16x16: '.'=transparan, O=outline, B=badan, L=kilau
+    private val base = arrayOf(
+        "....OO....OO....",
+        "...OBBO..OBBO...",
+        "..OBBBBOOBBBBO..",
+        ".OBBBBBBBBBBBBO.",
+        ".OBLLBBBBBBBBBO.",
+        "OBBLBBBBBBBBBBBO",
+        "OBBBBBBBBBBBBBBO",
+        "OBBBBBBBBBBBBBBO",
+        "OBBBBBBBBBBBBBBO",
+        "OBBBBBBBBBBBBBBO",
+        "OBBBBBBBBBBBBBBO",
+        ".OBBBBBBBBBBBBO.",
+        ".OBBBBBBBBBBBBO.",
+        "..OBBBBBBBBBBO..",
+        "...OBBBBBBBBO...",
+        "....OOOOOOOO....",
+    )
+
+    // piksel tajam: TANPA anti-alias, khas 8-bit
+    private fun crisp(c: String) = Paint().apply { color = Color.parseColor(c) }
+
+    private val outline = crisp("#5D4157")
+    private val body = crisp("#FFD1DC")
+    private val light = crisp("#FFEAF1")
+    private val eye = crisp("#3A2E39")
+    private val white = crisp("#FFFFFF")
+    private val blush = crisp("#FF9EB5")
+    private val heart = crisp("#FF5D8F")
+    private val tear = crisp("#7EC8E3")
 
     private var phase = 0f
     private var blink = false
@@ -63,14 +64,14 @@ class PetView(context: Context) : View(context) {
 
     private val animator = object : Runnable {
         override fun run() {
-            phase += 0.22f
+            phase += 0.35f
             val now = System.currentTimeMillis()
             if (now > nextBlinkAt) {
                 blink = !blink
                 nextBlinkAt = now + if (blink) 130 else (1500 + Random.nextLong(3500))
             }
             invalidate()
-            postDelayed(this, 50)
+            postDelayed(this, 80) // ~12 fps, biar terasa retro
         }
     }
 
@@ -84,94 +85,108 @@ class PetView(context: Context) : View(context) {
         super.onDetachedFromWindow()
     }
 
+    private var cell = 0f
+    private var offX = 0f
+    private var offY = 0f
+
+    private fun px(canvas: Canvas, col: Int, row: Int, paint: Paint) {
+        val x = offX + col * cell
+        val y = offY + row * cell
+        canvas.drawRect(x, y, x + cell, y + cell, paint)
+    }
+
     override fun onDraw(canvas: Canvas) {
         val w = width.toFloat()
         val h = height.toFloat()
-        val u = w / 100f
-        stroke.strokeWidth = 1.2f * u
-        zzz.textSize = 11f * u
+        cell = minOf(w, h) / 16f
+        offX = (w - cell * 16f) / 2f
+        offY = (h - cell * 16f) / 2f
 
-        // squash & stretch kenyal, berpusat di dasar slime
-        val squish = sin(phase) * (if (walking) 0.07f else 0.025f)
+        // bob 8-bit: lompat 1 piksel, lebih hidup saat jalan
+        val bob = if (walking) {
+            if (sin(phase) > 0) -1 else 0
+        } else {
+            if (sin(phase * 0.4f) > 0.7f) -1 else 0
+        }
+
         canvas.save()
-        canvas.scale(1f + squish, 1f - squish, w / 2f, h - 2f * u)
+        canvas.translate(0f, bob * cell)
         if (facing < 0) canvas.scale(-1f, 1f, w / 2f, h / 2f)
 
-        // badan: genangan bawah (lebih gelap, kesan jelly) + kubah
-        canvas.drawOval(RectF(6f * u, 68f * u, 94f * u, 97f * u), bodyShade)
-        canvas.drawOval(RectF(13f * u, 12f * u, 87f * u, 94f * u), body)
-
-        // kilau glossy
-        canvas.drawOval(RectF(22f * u, 20f * u, 42f * u, 38f * u), gloss)
-        canvas.drawCircle(58f * u, 24f * u, 3.5f * u, sparkleWhite)
+        // badan dasar
+        for (r in base.indices) {
+            val row = base[r]
+            for (c in row.indices) {
+                when (row[c]) {
+                    'O' -> px(canvas, c, r, outline)
+                    'B' -> px(canvas, c, r, body)
+                    'L' -> px(canvas, c, r, light)
+                }
+            }
+        }
 
         // mata
         val sleepy = emotion == Emotion.SLEEPY
-        if (blink || sleepy) {
-            // mata terpejam: lengkung ∩ yang damai
-            canvas.drawArc(RectF(28f * u, 48f * u, 42f * u, 60f * u), 180f, 180f, false, stroke)
-            canvas.drawArc(RectF(58f * u, 48f * u, 72f * u, 60f * u), 180f, 180f, false, stroke)
-        } else if (emotion == Emotion.LOVE) {
-            drawHeart(canvas, 35f * u, 53f * u, 10f * u)
-            drawHeart(canvas, 65f * u, 53f * u, 10f * u)
-        } else {
-            val grow = if (emotion == Emotion.SURPRISED) 1.6f * u else 0f
-            // mata oval besar berbinar
-            canvas.drawOval(RectF(29f * u - grow, 45f * u - grow, 41f * u + grow, 62f * u + grow), eye)
-            canvas.drawOval(RectF(59f * u - grow, 45f * u - grow, 71f * u + grow, 62f * u + grow), eye)
-            // binar: satu besar di atas, satu kecil di bawah
-            canvas.drawCircle(32.5f * u, 49f * u, 2.4f * u, white)
-            canvas.drawCircle(62.5f * u, 49f * u, 2.4f * u, white)
-            canvas.drawCircle(38f * u, 57f * u, 1.2f * u, white)
-            canvas.drawCircle(68f * u, 57f * u, 1.2f * u, white)
+        when {
+            blink || sleepy -> {
+                // mata terpejam: garis datar
+                px(canvas, 4, 7, eye); px(canvas, 5, 7, eye)
+                px(canvas, 10, 7, eye); px(canvas, 11, 7, eye)
+            }
+            emotion == Emotion.LOVE -> {
+                drawPixelHeart(canvas, 3, 6)
+                drawPixelHeart(canvas, 10, 6)
+            }
+            else -> {
+                // mata 2x3 dengan kilau putih
+                for (r in 6..8) {
+                    px(canvas, 4, r, eye); px(canvas, 5, r, eye)
+                    px(canvas, 10, r, eye); px(canvas, 11, r, eye)
+                }
+                px(canvas, 4, 6, white)
+                px(canvas, 10, 6, white)
+            }
         }
 
         // pipi merona
-        canvas.drawOval(RectF(17f * u, 60f * u, 29f * u, 67f * u), blushP)
-        canvas.drawOval(RectF(71f * u, 60f * u, 83f * u, 67f * u), blushP)
+        px(canvas, 2, 9, blush); px(canvas, 3, 9, blush)
+        px(canvas, 12, 9, blush); px(canvas, 13, 9, blush)
 
-        // mulut
+        // mulut + aksesori emosi
         when (emotion) {
-            Emotion.HAPPY, Emotion.LOVE ->
-                canvas.drawArc(RectF(42f * u, 62f * u, 58f * u, 74f * u), 20f, 140f, false, stroke)
-            Emotion.NEUTRAL ->
-                canvas.drawArc(RectF(45f * u, 64f * u, 55f * u, 72f * u), 30f, 120f, false, stroke)
-            Emotion.SAD -> {
-                canvas.drawArc(RectF(43f * u, 70f * u, 57f * u, 80f * u), 200f, 140f, false, stroke)
-                drawTear(canvas, 70f * u, 62f * u, 4f * u)
+            Emotion.HAPPY, Emotion.LOVE -> { // senyum U
+                px(canvas, 6, 9, eye); px(canvas, 9, 9, eye)
+                px(canvas, 7, 10, eye); px(canvas, 8, 10, eye)
             }
-            Emotion.SURPRISED ->
-                canvas.drawOval(RectF(46f * u, 66f * u, 54f * u, 76f * u), eye)
-            Emotion.SLEEPY -> {
-                canvas.drawCircle(50f * u, 70f * u, 3f * u, eye)
-                canvas.drawText("z", 76f * u, 30f * u, zzz)
-                canvas.drawText("z", 84f * u, 20f * u, zzz)
+            Emotion.NEUTRAL -> {
+                px(canvas, 7, 10, eye); px(canvas, 8, 10, eye)
+            }
+            Emotion.SAD -> { // cemberut ∩ + air mata
+                px(canvas, 7, 10, eye); px(canvas, 8, 10, eye)
+                px(canvas, 6, 11, eye); px(canvas, 9, 11, eye)
+                px(canvas, 12, 8, tear); px(canvas, 12, 9, tear)
+            }
+            Emotion.SURPRISED -> { // mulut o 2x2
+                px(canvas, 7, 9, eye); px(canvas, 8, 9, eye)
+                px(canvas, 7, 10, eye); px(canvas, 8, 10, eye)
+            }
+            Emotion.SLEEPY -> { // mulut kecil + Z melayang
+                px(canvas, 7, 10, eye)
+                px(canvas, 12, 1, eye); px(canvas, 13, 1, eye); px(canvas, 14, 1, eye)
+                px(canvas, 13, 2, eye)
+                px(canvas, 12, 3, eye); px(canvas, 13, 3, eye); px(canvas, 14, 3, eye)
             }
         }
 
         canvas.restore()
     }
 
-    private fun drawHeart(canvas: Canvas, cx: Float, cy: Float, s: Float) {
-        canvas.drawCircle(cx - s * 0.35f, cy - s * 0.2f, s * 0.42f, heartP)
-        canvas.drawCircle(cx + s * 0.35f, cy - s * 0.2f, s * 0.42f, heartP)
-        val path = Path().apply {
-            moveTo(cx - s * 0.72f, cy - s * 0.05f)
-            lineTo(cx, cy + s * 0.7f)
-            lineTo(cx + s * 0.72f, cy - s * 0.05f)
-            close()
-        }
-        canvas.drawPath(path, heartP)
-    }
-
-    private fun drawTear(canvas: Canvas, cx: Float, cy: Float, s: Float) {
-        val path = Path().apply {
-            moveTo(cx, cy - s)
-            quadTo(cx + s, cy + s * 0.6f, cx, cy + s)
-            quadTo(cx - s, cy + s * 0.6f, cx, cy - s)
-            close()
-        }
-        canvas.drawPath(path, tearP)
+    /** Hati piksel 3x3, pojok kiri-atas di (col,row). */
+    private fun drawPixelHeart(canvas: Canvas, col: Int, row: Int) {
+        px(canvas, col, row, heart); px(canvas, col + 2, row, heart)
+        px(canvas, col, row + 1, heart); px(canvas, col + 1, row + 1, heart)
+        px(canvas, col + 2, row + 1, heart)
+        px(canvas, col + 1, row + 2, heart)
     }
 
     companion object {

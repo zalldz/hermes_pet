@@ -10,6 +10,7 @@ import com.hermespet.Prefs.apiModel
 import com.hermespet.Prefs.brainMode
 import com.hermespet.Prefs.latitude
 import com.hermespet.Prefs.longitude
+import com.hermespet.Prefs.soulMd
 import okhttp3.Call
 import okhttp3.Callback
 import okhttp3.MediaType.Companion.toMediaType
@@ -47,11 +48,11 @@ object Brain {
     private var lastWeatherSay = 0L
     private var lastLowBatt = 0L
 
-    private const val SYSTEM_PROMPT =
-        "Kamu adalah pet virtual lucu yang tinggal di layar HP pemilikmu. Tugasmu " +
-        "menemani dan membantu dia. Balas HANYA dengan JSON satu baris: " +
-        "{\"say\": \"<komentar singkat max 120 huruf, bahasa Indonesia santai>\", " +
-        "\"emotion\": \"<happy|sad|neutral|sleepy|surprised|love>\"}"
+    /** SOUL.md pengguna + aturan format yang tidak boleh dilanggar (untuk parsing). */
+    private fun systemPrompt(ctx: Context): String =
+        ctx.soulMd + "\n\nFORMAT WAJIB: balas HANYA dengan JSON satu baris: " +
+            "{\"say\": \"<komentar singkat, bahasa Indonesia santai>\", " +
+            "\"emotion\": \"<happy|sad|neutral|sleepy|surprised|love>\"}"
 
     fun sendEvent(ctx: Context, type: String, data: JSONObject, onReply: (JSONObject?) -> Unit) {
         if (ctx.brainMode == "termux") {
@@ -158,7 +159,7 @@ object Brain {
             .put("max_tokens", 200)
             .put("temperature", 0.8)
             .put("messages", JSONArray()
-                .put(JSONObject().put("role", "system").put("content", SYSTEM_PROMPT))
+                .put(JSONObject().put("role", "system").put("content", systemPrompt(ctx)))
                 .put(JSONObject().put("role", "user").put("content", context)))
         val req = Request.Builder()
             .url(ctx.apiBaseUrl.trimEnd('/') + "/chat/completions")
