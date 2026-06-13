@@ -83,9 +83,15 @@ class PetView(context: Context) : View(context) {
     private var blink = false
     private var nextBlinkAt = System.currentTimeMillis() + 2000
 
+    // efek gepeng saat membentur (dipakai fisika lempar)
+    private var impact = 0f
+    private var impactAxisX = false
+    fun bump(axisX: Boolean) { impact = 1f; impactAxisX = axisX; invalidate() }
+
     private val animator = object : Runnable {
         override fun run() {
             phase += 0.13f
+            if (impact > 0.01f) impact *= 0.82f else impact = 0f
             val now = System.currentTimeMillis()
             if (now > nextBlinkAt) {
                 blink = !blink
@@ -157,8 +163,13 @@ class PetView(context: Context) : View(context) {
             bobPx = 0f
             squashSigned = sin(phase * 0.8f) * 0.045f
         }
-        val sx = 1f + squashSigned
-        val sy = 1f - squashSigned
+        var sx = 1f + squashSigned
+        var sy = 1f - squashSigned
+        // benturan: gepeng pada sumbu tumbukan (lantai = pipih, dinding = ramping)
+        if (impact > 0f) {
+            if (impactAxisX) { sx *= 1f - 0.28f * impact; sy *= 1f + 0.20f * impact }
+            else { sy *= 1f - 0.32f * impact; sx *= 1f + 0.24f * impact }
+        }
         val baseY = offY + cell * 15f // dasar sprite = "tanah"
 
         canvas.save()

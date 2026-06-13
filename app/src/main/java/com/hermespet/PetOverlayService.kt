@@ -71,6 +71,10 @@ class PetOverlayService : Service() {
     private var walkTargetX = -1
     private var pausedUntil = 0L
     private var posX = 0f
+    // --- fisika lempar ---
+    private var flinging = false
+    private var velX = 0f; private var velY = 0f   // px/ms saat lepas tangan
+    private var fx = 0f; private var fy = 0f        // posisi float saat melayang
     private var hopStart = 0L      // 0 = tidak sedang melompat
     private var hopFrom = 0f
     private var hopDist = 0f
@@ -92,6 +96,7 @@ class PetOverlayService : Service() {
         registerReceiver(screenReceiver, IntentFilter().apply {
             addAction(Intent.ACTION_SCREEN_ON)
             addAction(Intent.ACTION_SCREEN_OFF)
+            addAction(Intent.ACTION_USER_PRESENT)
         })
         handler.post(walkLoop)
         handler.postDelayed(tickLoop, 5_000)
@@ -102,8 +107,9 @@ class PetOverlayService : Service() {
         transientUntil = System.currentTimeMillis() + 8_000
     }
 
-    // --- hemat baterai: hentikan animasi & jalan saat layar mati ---
+    // --- hemat baterai + sapaan proaktif ---
     @Volatile private var screenOn = true
+    private var lastGreetAt = 0L
     private val screenReceiver = object : android.content.BroadcastReceiver() {
         override fun onReceive(c: Context?, i: Intent?) {
             when (i?.action) {
@@ -112,8 +118,22 @@ class PetOverlayService : Service() {
                     screenOn = true; pet.awake = true
                     pet.emotion = Mood.current(this@PetOverlayService)
                 }
+                Intent.ACTION_USER_PRESENT -> maybeGreet() // buka kunci → sapa
             }
         }
+    }
+
+    /** Sapaan proaktif saat buka kunci — maksimal sekali tiap 2 jam, & hanya kalau
+     *  sudah lama tak menyapa. Lewat otak agar mengikuti kepribadian (SOUL.md). */
+    private fun maybeGreet() {
+        val now = System.currentTimeMillis()
+        if (now - lastGreetAt < 2 * 3_600_000L) return
+        val gap = now - Mood.lastSeen(this)
+        if (gap < 25 * 60_000L) return // baru saja pegang HP → jangan cerewet
+        lastGreetAt = now
+        val hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
+        val data = JSONObject().put("hour", hour).put("away_minutes", gap / 60_000)
+        sendToBrain("greet", data)
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -211,6 +231,7 @@ class PetOverlayService : Service() {
         var startX = 0; var startY = 0
         var dragging = false
         var downAt = 0L
+        var lastMoveX = 0f; var lastMoveY = 0f; var lastMoveT = 0L
 
         root.setOnTouchListener { _, ev ->
             scaleDetector.onTouchEvent(ev)
@@ -221,6 +242,9 @@ class PetOverlayService : Service() {
                     startX = lp.x; startY = lp.y
                     dragging = false
                     downAt = System.currentTimeMillis()
+                    flinging = false // ditangkap saat melayang
+                    velX = 0f; velY = 0f
+                    lastMoveX = ev.rawX; lastMoveY = ev.rawY; lastMoveT = downAt
                     pausedUntil = System.currentTimeMillis() + 8_000 // jangan jalan saat dipegang
                     true
                 }
@@ -232,13 +256,24 @@ class PetOverlayService : Service() {
                         lp.y = startY + dy.toInt()
                         wm.updateViewLayout(root, lp)
                         if (bubbleShown) positionBubble()
+                        // kecepatan sesaat (px/ms) untuk lemparan
+                        val t = System.currentTimeMillis()
+                        val dt = (t - lastMoveT).coerceAtLeast(1)
+                        velX = (ev.rawX - lastMoveX) / dt
+                        velY = (ev.rawY - lastMoveY) / dt
+                        lastMoveX = ev.rawX; lastMoveY = ev.rawY; lastMoveT = t
                     }
                     true
                 }
                 MotionEvent.ACTION_UP -> {
                     val now = System.currentTimeMillis()
                     when {
-                        dragging -> { petX = lp.x; petY = lp.y; posX = lp.x.toFloat() }
+                        dragging -> {
+                            petX = lp.x; petY = lp.y; posX = lp.x.toFloat()
+                            // lempar kalau lepas dengan kecepatan cukup
+                            val speedPxs = kotlin.math.hypot(velX.toDouble(), velY.toDouble()) * 1000
+                            if (speedPxs > 600 && now - lastMoveT < 120) startFling()
+                        }
                         now - downAt > 400 -> toggleChat() // tahan = ngobrol via ketik
                         now - lastTapAt < 350 -> { // double-tap = ngobrol via suara
                             handler.removeCallbacks(pokeRunnable)
@@ -395,12 +430,50 @@ class PetOverlayService : Service() {
 
     // ---------------------------------------------------------------- jalan-jalan
 
+    private fun startFling() {
+        flinging = true
+        pet.hopT = -1f
+        fx = lp.x.toFloat(); fy = lp.y.toFloat()
+        // px/ms → px/frame (~16ms)
+        velX *= 16f; velY *= 16f
+    }
+
+    /** Satu langkah fisika lemparan: gravitasi + pantul tepi layar + redam. */
+    private fun flingStep() {
+        val maxX = (resources.displayMetrics.widthPixels - pet.width).toFloat().coerceAtLeast(1f)
+        val maxY = (resources.displayMetrics.heightPixels - pet.height).toFloat().coerceAtLeast(1f)
+        velY += 1.4f                     // gravitasi
+        velX *= 0.995f                   // gesekan udara
+        fx += velX; fy += velY
+        val restitution = 0.62f
+        if (fx <= 0f) { fx = 0f; velX = -velX * restitution; pet.bump(true) }
+        else if (fx >= maxX) { fx = maxX; velX = -velX * restitution; pet.bump(true) }
+        if (fy <= 0f) { fy = 0f; velY = -velY * restitution }
+        else if (fy >= maxY) { // mendarat di "lantai"
+            fy = maxY
+            if (velY > 4f) pet.bump(false)
+            velY = -velY * restitution
+            velX *= 0.7f                  // gesekan lantai
+        }
+        lp.x = fx.toInt(); lp.y = fy.toInt()
+        runCatching { wm.updateViewLayout(root, lp) }
+        if (bubbleShown) positionBubble()
+        // berhenti saat sudah menempel lantai & nyaris diam
+        if (fy >= maxY - 1f && kotlin.math.abs(velY) < 4f && kotlin.math.abs(velX) < 0.5f) {
+            flinging = false
+            posX = fx.coerceIn(0f, maxX); petX = lp.x; petY = lp.y
+            pausedUntil = System.currentTimeMillis() + 1_500
+            walkTargetX = -1
+        }
+    }
+
     private val walkLoop = object : Runnable {
         override fun run() {
             if (!screenOn) { // layar mati → jangan render/gerak (hemat baterai)
                 handler.postDelayed(this, 1_000)
                 return
             }
+            if (flinging) { flingStep(); handler.postDelayed(this, WALK_FRAME_MS); return }
             val now = System.currentTimeMillis()
             val maxX = (resources.displayMetrics.widthPixels - pet.width).coerceAtLeast(1)
             if (now >= pausedUntil) {
@@ -567,22 +640,39 @@ class PetOverlayService : Service() {
         val text = reply.optString("say", "")
         if (text.isNotEmpty()) {
             PetLog.add(this, "pet", text)
-            say(text, null)
+            say(text, null, typewriter = true)
             speak(text)
         }
         reply.optJSONObject("action")?.let { act ->
             val feedback = Actions.run(this, act)
             if (!feedback.isNullOrEmpty()) {
                 PetLog.add(this, "aksi", feedback)
-                if (text.isEmpty()) { say(feedback, null); speak(feedback) }
+                if (text.isEmpty()) { say(feedback, null, typewriter = true); speak(feedback) }
             }
         }
     }
 
-    private fun say(text: String, emotion: PetView.Emotion?) {
+    private var typeFull = ""
+    private var typeIdx = 0
+    private val typeRunnable = object : Runnable {
+        override fun run() {
+            typeIdx = (typeIdx + 1).coerceAtMost(typeFull.length)
+            bubble.text = typeFull.substring(0, typeIdx)
+            positionBubble()
+            if (typeIdx < typeFull.length) handler.postDelayed(this, 26)
+        }
+    }
+
+    private fun say(text: String, emotion: PetView.Emotion?, typewriter: Boolean = false) {
         emotion?.let { pet.emotion = it }
-        bubble.text = text
+        handler.removeCallbacks(typeRunnable)
         val firstShow = !bubbleShown
+        if (typewriter && text.length > 6) {
+            typeFull = text; typeIdx = 0; bubble.text = ""
+            handler.postDelayed(typeRunnable, 120) // efek "mengetik"
+        } else {
+            bubble.text = text
+        }
         if (firstShow) {
             runCatching { wm.addView(bubble, bubbleLp) }
             bubbleShown = true
@@ -599,8 +689,9 @@ class PetOverlayService : Service() {
             }
         }
         handler.removeCallbacks(hideBubble)
-        // durasi baca menyesuaikan panjang teks (6–40 detik), proporsional jumlah kata
-        val duration = (5_000L + text.length * 70L).coerceIn(6_000L, 40_000L)
+        // durasi baca menyesuaikan panjang teks (6–40 detik) + waktu mengetik
+        val typeMs = if (typewriter) text.length * 26L else 0L
+        val duration = (5_000L + text.length * 70L + typeMs).coerceIn(6_000L, 45_000L)
         handler.postDelayed(hideBubble, duration)
         // berhenti jalan selama bicara biar enak dibaca
         pausedUntil = maxOf(pausedUntil,
@@ -621,6 +712,7 @@ class PetOverlayService : Service() {
     }
 
     private val hideBubble = Runnable {
+        handler.removeCallbacks(typeRunnable)
         if (!bubbleShown) return@Runnable
         bubble.animate().alpha(0f).scaleX(0.7f).scaleY(0.7f).setDuration(160)
             .withEndAction {

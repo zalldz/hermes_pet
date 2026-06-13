@@ -26,6 +26,8 @@ object Mood {
         ctx.lastInteraction = System.currentTimeMillis()
     }
 
+    fun lastSeen(ctx: Context): Long = ctx.lastInteraction
+
     /** Emosi baseline pet sekarang (untuk ditampilkan saat idle). */
     fun current(ctx: Context): PetView.Emotion {
         val now = System.currentTimeMillis()

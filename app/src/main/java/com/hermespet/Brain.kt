@@ -108,6 +108,7 @@ object Brain {
             "mood" -> handleMood(ctx, data, onReply)
             "poke" -> handlePoke(ctx, onReply)
             "chat" -> handleChat(ctx, data, onReply)
+            "greet" -> handleGreet(ctx, data, onReply)
             else -> onReply(null)
         }
     }
@@ -258,6 +259,24 @@ object Brain {
                 onReply(reply)
             }
         }
+    }
+
+    private fun handleGreet(ctx: Context, data: JSONObject, onReply: (JSONObject?) -> Unit) {
+        val hour = data.optInt("hour", 12)
+        val away = data.optInt("away_minutes", 60)
+        val waktu = when (hour) {
+            in 5..10 -> "pagi"; in 11..14 -> "siang"; in 15..18 -> "sore"; else -> "malam"
+        }
+        val fallback = when (waktu) {
+            "pagi" -> "Selamat pagi! ☀️ Semangat ya hari ini!"
+            "siang" -> "Halo, udah makan siang belum? 😋"
+            "sore" -> "Sore~ gimana harimu? 🌇"
+            else -> "Udah malam, jangan begadang ya 🌙"
+        }
+        askHermes(ctx,
+            "Pemilikmu baru membuka HP setelah $away menit. Sekarang waktu $waktu (jam $hour). " +
+                "Sapa dia duluan dengan hangat & singkat, sesuai waktu.",
+            fallback, if (waktu == "malam") "sleepy" else "happy", onReply)
     }
 
     private fun handlePoke(ctx: Context, onReply: (JSONObject?) -> Unit) {
