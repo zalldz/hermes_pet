@@ -508,6 +508,13 @@ class PetOverlayService : Service() {
         }
     }
 
+    /** Teks yang di-share ke pet → diperlakukan sebagai chat. */
+    fun onSharedText(text: String) = handler.post {
+        PetLog.add(this, "user", "📩 $text")
+        say("🤔...", null)
+        sendToBrain("chat", JSONObject().put("text", text))
+    }
+
     /** Dipanggil ReminderReceiver saat pengingat tiba & pet sedang hidup. */
     fun announceReminder(text: String) {
         handler.post {
