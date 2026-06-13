@@ -47,6 +47,11 @@ object Prefs {
         get() = sp(this).getString("lon", "106.8") ?: "106.8"
         set(v) = sp(this).edit().putString("lon", v).apply()
 
+    /** Bentuk pet: SLIME, KUCING, KELINCI, HANTU, ANAK_AYAM */
+    var Context.petDesign: String
+        get() = sp(this).getString("pet_design", "SLIME") ?: "SLIME"
+        set(v) = sp(this).edit().putString("pet_design", v).apply()
+
     /** Skala pet, 0.5 .. 2.5 */
     var Context.petScale: Float
         get() = sp(this).getFloat("pet_scale", 1.0f)

@@ -31,25 +31,11 @@ class PetView(context: Context) : View(context) {
             if (v) post(animator) else removeCallbacks(animator)
         }
 
-    // sprite dasar 16x16: O=outline, B=badan, L=kilau, S=bayangan
-    private val base = arrayOf(
-        ".......OO.......",
-        "......OBBO......",
-        ".......OO.......",
-        "....OOOOOOOO....",
-        "..OOBLLBBBBBOO..",
-        ".OBLLBBBBBBBBBO.",
-        ".OBLBBBBBBBBBBO.",
-        "OBBBBBBBBBBBBBBO",
-        "OBBBBBBBBBBBBBBO",
-        "OBBBBBBBBBBBBBBO",
-        "OBBBBBBBBBBBBSBO",
-        "OBBBBBBBBBBSSSBO",
-        ".OSBBBBBBSSSSSO.",
-        ".OSSSSSSSSSSSSO.",
-        "..OOOOOOOOOOOO..",
-        "................",
-    )
+    /** Pilihan bentuk pet — semua tetap ikut warna mood. */
+    var design: String = "SLIME"
+        set(v) { field = v; invalidate() }
+
+    private val base: Array<String> get() = DESIGNS[design] ?: DESIGNS["SLIME"]!!
 
     // warna per-mood: [body, light, shade, outline]
     private fun palette(e: Emotion): IntArray = when (e) {
@@ -72,6 +58,7 @@ class PetView(context: Context) : View(context) {
     private val heart = Paint().apply { color = Color.parseColor("#FF5D8F") }
     private val tear = Paint().apply { color = Color.parseColor("#7EC8E3") }
     private val angryC = Paint().apply { color = Color.parseColor("#C62828") }
+    private val beak = Paint().apply { color = Color.parseColor("#F2A03D") } // paruh anak ayam
 
     private var phase = 0f
     private var blink = false
@@ -155,6 +142,7 @@ class PetView(context: Context) : View(context) {
                     'B' -> px(canvas, c, r, body)
                     'L' -> px(canvas, c, r, light)
                     'S' -> px(canvas, c, r, shade)
+                    'J' -> px(canvas, c, r, beak)
                 }
             }
         }
@@ -229,6 +217,46 @@ class PetView(context: Context) : View(context) {
     }
 
     companion object {
+        /** Pilihan bentuk (kode -> sprite 16x16). Huruf: O outline, B badan, L kilau, S bayangan, J paruh. */
+        val DESIGNS: Map<String, Array<String>> = linkedMapOf(
+            "SLIME" to arrayOf(
+                ".......OO.......", "......OBBO......", ".......OO.......", "....OOOOOOOO....",
+                "..OOBLLBBBBBOO..", ".OBLLBBBBBBBBBO.", ".OBLBBBBBBBBBBO.", "OBBBBBBBBBBBBBBO",
+                "OBBBBBBBBBBBBBBO", "OBBBBBBBBBBBBBBO", "OBBBBBBBBBBBBSBO", "OBBBBBBBBBBSSSBO",
+                ".OSBBBBBBSSSSSO.", ".OSSSSSSSSSSSSO.", "..OOOOOOOOOOOO..", "................",
+            ),
+            "KUCING" to arrayOf(
+                "..OO........OO..", "..OBO......OBO..", "..OBBO....OBBO..", ".OBBBBOOOOBBBBO.",
+                ".OBLLBBBBBBBBBO.", "OBLLBBBBBBBBBBBO", "OBLBBBBBBBBBBBBO", "OBBBBBBBBBBBBBBO",
+                "OBBBBBBBBBBBBBBO", "OBBBBBBBBBBBBBBO", "OBBBBBBBBBBBBSBO", "OBBBBBBBBBBSSSBO",
+                ".OBBBBBBBSSSSSO.", ".OSBBBSSSSSSSSO.", "..OOOOOOOOOOOO..", "................",
+            ),
+            "KELINCI" to arrayOf(
+                "...OO....OO.....", "..OBBO..OBBO....", "..OBBO..OBBO....", "..OBBO..OBBO....",
+                "..OBBOOOOBBO....", ".OBBLLBBBBBBO...", ".OBLLBBBBBBBBO..", "OBLBBBBBBBBBBBO.",
+                "OBBBBBBBBBBBBBO.", "OBBBBBBBBBBBBBO.", "OBBBBBBBBBBBBBO.", "OBBBBBBBBBBBSBO.",
+                ".OBBBBBBBSSSBO..", ".OSBBBBSSSSSO...", "..OOOOOOOOOO....", "................",
+            ),
+            "HANTU" to arrayOf(
+                "....OOOOOOOO....", "..OOBLLBBBBBOO..", ".OBLLBBBBBBBBBO.", ".OBLBBBBBBBBBBO.",
+                "OBLBBBBBBBBBBBBO", "OBBBBBBBBBBBBBBO", "OBBBBBBBBBBBBBBO", "OBBBBBBBBBBBBBBO",
+                "OBBBBBBBBBBBBBBO", "OBBBBBBBBBBBBBBO", "OBBBBBBBBBBBBBBO", "OBBBBBBBBBBBBBBO",
+                "OBOBBOBBOBBOBBBO", "OBOBBOBBOBBOBBBO", "O.OO.OO..OO.OO.O", "................",
+            ),
+            "ANAK_AYAM" to arrayOf(
+                ".......OO.......", "......OBBBO.....", ".....OBBBBBO....", "....OOOOOOOOO...",
+                "..OOBLLBBBBBOO..", ".OBLLBBBBBBBBBO.", ".OBLBBBBBBBBBBO.", "OBBBBBBBBBBBBBBO",
+                "OBBBBBBJJBBBBBBO", "OBBBBBBBBBBBBBBO", "OBBBBBBBBBBBBBBO", ".OBBBBBBBBBBBBO.",
+                ".OSBBBBBBBBBSO..", "..OOSSSSSSSSO...", "...OO......OO...", "................",
+            ),
+        )
+
+        /** Nama tampilan untuk pemilih di pengaturan. */
+        val DESIGN_LABELS = linkedMapOf(
+            "SLIME" to "🟢 Slime", "KUCING" to "🐱 Kucing", "KELINCI" to "🐰 Kelinci",
+            "HANTU" to "👻 Hantu", "ANAK_AYAM" to "🐤 Anak Ayam",
+        )
+
         fun emotionFrom(s: String?): Emotion = when (s?.lowercase()) {
             "happy", "senang" -> Emotion.HAPPY
             "sad", "sedih" -> Emotion.SAD

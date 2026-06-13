@@ -28,6 +28,7 @@ import com.hermespet.Prefs.visionModel
 import com.hermespet.Prefs.latitude
 import com.hermespet.Prefs.longitude
 import com.hermespet.Prefs.moodCheckEnabled
+import com.hermespet.Prefs.petDesign
 import com.hermespet.Prefs.petScale
 import com.hermespet.Prefs.petVoice
 import com.hermespet.Prefs.sendMoodImage
@@ -181,6 +182,26 @@ class MainActivity : Activity() {
 
         // --- pet ---
         col.addView(section("3. Pet"))
+        col.addView(TextView(this).apply { text = "Pilih bentuk pet:" })
+        val designRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+        val designLabel = TextView(this).apply {
+            text = "Sekarang: ${PetView.DESIGN_LABELS[petDesign] ?: petDesign}"
+            setPadding(0, 0, 0, 8)
+        }
+        PetView.DESIGN_LABELS.forEach { (code, label) ->
+            designRow.addView(button(label) {
+                petDesign = code
+                designLabel.text = "Sekarang: $label"
+                if (PetOverlayService.instance != null) {
+                    startService(Intent(this@MainActivity, PetOverlayService::class.java)
+                        .setAction(PetOverlayService.ACTION_APPLY_DESIGN))
+                }
+                toastStatus("Bentuk pet: $label")
+            })
+        }
+        col.addView(designLabel)
+        col.addView(android.widget.HorizontalScrollView(this).apply { addView(designRow) })
+
         col.addView(TextView(this).apply { text = "Ukuran pet (bisa juga pinch langsung di pet):" })
         col.addView(SeekBar(this).apply {
             max = 200 // 0..200 → 0.5x..2.5x
