@@ -31,11 +31,25 @@ class PetView(context: Context) : View(context) {
             if (v) post(animator) else removeCallbacks(animator)
         }
 
-    /** Pilihan bentuk pet — semua tetap ikut warna mood. */
-    var design: String = "SLIME"
-        set(v) { field = v; invalidate() }
-
-    private val base: Array<String> get() = DESIGNS[design] ?: DESIGNS["SLIME"]!!
+    // sprite slime 16x16: O outline, B badan, L kilau, S bayangan
+    private val base = arrayOf(
+        ".....OOOOOO.....",
+        "...OOBBBBBBOO...",
+        "..OBBBBBBBBBBO..",
+        ".OBLLBBBBBBBBBO.",
+        ".OLLLBBBBBBBBBO.",
+        "OBLLBBBBBBBBBBBO",
+        "OBLBBBBBBBBBBBBO",
+        "OBBBBBBBBBBBBBBO",
+        "OBBBBBBBBBBBBBBO",
+        "OBBBBBBBBBBBBBBO",
+        "OBBBBBBBBBBBBBBO",
+        "OBBBBBBBBBBBBSBO",
+        ".OBBBBBBBBBSSBO.",
+        ".OSBBBBBBSSSSBO.",
+        "..OOSSSSSSSSOO..",
+        "....OOOOOOOO....",
+    )
 
     // warna per-mood: [body, light, shade, outline]
     private fun palette(e: Emotion): IntArray = when (e) {
@@ -58,7 +72,7 @@ class PetView(context: Context) : View(context) {
     private val heart = Paint().apply { color = Color.parseColor("#FF5D8F") }
     private val tear = Paint().apply { color = Color.parseColor("#7EC8E3") }
     private val angryC = Paint().apply { color = Color.parseColor("#C62828") }
-    private val beak = Paint().apply { color = Color.parseColor("#F2A03D") } // paruh anak ayam
+    private val shadow = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#332A2A35") }
 
     private var phase = 0f
     private var blink = false
@@ -118,20 +132,36 @@ class PetView(context: Context) : View(context) {
         for (i in cur.indices) cur[i] = lerp(cur[i], target[i], 0.12f)
         body.color = cur[0]; light.color = cur[1]; shade.color = cur[2]; outline.color = cur[3]
 
+        // --- gerak jelly kenyal: bob + squash&stretch (volume terjaga) + goyang ---
         val bobPx: Float
-        val squash: Float
+        val land: Float // 0..1, 1 = menyentuh tanah (paling gepeng)
         if (walking) {
-            val hop = kotlin.math.abs(sin(phase * 2.2f))
-            bobPx = hop * cell * 1.3f
-            squash = (1f - hop) * 0.09f
+            val hop = kotlin.math.abs(sin(phase * 2.1f))
+            bobPx = hop * cell * 1.6f
+            land = 1f - hop
         } else {
-            bobPx = (sin(phase * 0.45f) + 1f) * 0.5f * cell * 0.35f
-            squash = sin(phase * 0.45f) * 0.03f
+            val b = (sin(phase * 0.5f) + 1f) * 0.5f
+            bobPx = b * cell * 0.45f
+            land = (1f - b) * 0.55f
         }
+        // getaran kenyal terus-menerus + tekanan saat mendarat
+        val jiggle = sin(phase * 3.0f) * 0.022f
+        val squash = land * 0.16f + jiggle
+        val sway = sin(phase * 1.25f) * (if (walking) 0.05f else 0.025f) // goyang kiri-kanan
+
+        val baseY = offY + cell * 15.5f // titik tumpu di kaki slime
+
+        // bayangan memantul: melebar & lebih pekat saat slime turun
+        val shadowHalf = cell * (4.5f + land * 2f)
+        shadow.alpha = (60 + land * 45).toInt().coerceIn(0, 255)
+        canvas.drawOval(
+            w / 2f - shadowHalf, baseY + cell * 0.2f,
+            w / 2f + shadowHalf, baseY + cell * 1.5f, shadow
+        )
 
         canvas.save()
-        canvas.translate(0f, -bobPx)
-        canvas.scale(1f + squash, 1f - squash, w / 2f, offY + cell * 15f)
+        canvas.translate(sway * cell * 3f, -bobPx)
+        canvas.scale(1f + squash, 1f - squash, w / 2f, baseY) // gepeng = melebar, lonjak = tinggi
         if (facing < 0) canvas.scale(-1f, 1f, w / 2f, h / 2f)
 
         for (r in base.indices) {
@@ -142,7 +172,6 @@ class PetView(context: Context) : View(context) {
                     'B' -> px(canvas, c, r, body)
                     'L' -> px(canvas, c, r, light)
                     'S' -> px(canvas, c, r, shade)
-                    'J' -> px(canvas, c, r, beak)
                 }
             }
         }
@@ -157,11 +186,15 @@ class PetView(context: Context) : View(context) {
                 drawPixelHeart(canvas, 3, 6); drawPixelHeart(canvas, 10, 6)
             }
             else -> {
-                for (r in 6..9) {
+                val grow = if (emotion == Emotion.SURPRISED) 1 else 0
+                // mata besar bulat
+                for (r in (6 - grow)..(9 + grow)) {
                     px(canvas, 4, r, eye); px(canvas, 5, r, eye)
                     px(canvas, 10, r, eye); px(canvas, 11, r, eye)
                 }
+                // dua titik kilau tiap mata → efek berbinar
                 px(canvas, 4, 6, white); px(canvas, 10, 6, white)
+                px(canvas, 5, 9, white); px(canvas, 11, 9, white)
             }
         }
 
@@ -217,46 +250,6 @@ class PetView(context: Context) : View(context) {
     }
 
     companion object {
-        /** Pilihan bentuk (kode -> sprite 16x16). Huruf: O outline, B badan, L kilau, S bayangan, J paruh. */
-        val DESIGNS: Map<String, Array<String>> = linkedMapOf(
-            "SLIME" to arrayOf(
-                ".......OO.......", "......OBBO......", ".......OO.......", "....OOOOOOOO....",
-                "..OOBLLBBBBBOO..", ".OBLLBBBBBBBBBO.", ".OBLBBBBBBBBBBO.", "OBBBBBBBBBBBBBBO",
-                "OBBBBBBBBBBBBBBO", "OBBBBBBBBBBBBBBO", "OBBBBBBBBBBBBSBO", "OBBBBBBBBBBSSSBO",
-                ".OSBBBBBBSSSSSO.", ".OSSSSSSSSSSSSO.", "..OOOOOOOOOOOO..", "................",
-            ),
-            "KUCING" to arrayOf(
-                "..OO........OO..", "..OBO......OBO..", "..OBBO....OBBO..", ".OBBBBOOOOBBBBO.",
-                ".OBLLBBBBBBBBBO.", "OBLLBBBBBBBBBBBO", "OBLBBBBBBBBBBBBO", "OBBBBBBBBBBBBBBO",
-                "OBBBBBBBBBBBBBBO", "OBBBBBBBBBBBBBBO", "OBBBBBBBBBBBBSBO", "OBBBBBBBBBBSSSBO",
-                ".OBBBBBBBSSSSSO.", ".OSBBBSSSSSSSSO.", "..OOOOOOOOOOOO..", "................",
-            ),
-            "KELINCI" to arrayOf(
-                "...OO....OO.....", "..OBBO..OBBO....", "..OBBO..OBBO....", "..OBBO..OBBO....",
-                "..OBBOOOOBBO....", ".OBBLLBBBBBBO...", ".OBLLBBBBBBBBO..", "OBLBBBBBBBBBBBO.",
-                "OBBBBBBBBBBBBBO.", "OBBBBBBBBBBBBBO.", "OBBBBBBBBBBBBBO.", "OBBBBBBBBBBBSBO.",
-                ".OBBBBBBBSSSBO..", ".OSBBBBSSSSSO...", "..OOOOOOOOOO....", "................",
-            ),
-            "HANTU" to arrayOf(
-                "....OOOOOOOO....", "..OOBLLBBBBBOO..", ".OBLLBBBBBBBBBO.", ".OBLBBBBBBBBBBO.",
-                "OBLBBBBBBBBBBBBO", "OBBBBBBBBBBBBBBO", "OBBBBBBBBBBBBBBO", "OBBBBBBBBBBBBBBO",
-                "OBBBBBBBBBBBBBBO", "OBBBBBBBBBBBBBBO", "OBBBBBBBBBBBBBBO", "OBBBBBBBBBBBBBBO",
-                "OBOBBOBBOBBOBBBO", "OBOBBOBBOBBOBBBO", "O.OO.OO..OO.OO.O", "................",
-            ),
-            "ANAK_AYAM" to arrayOf(
-                ".......OO.......", "......OBBBO.....", ".....OBBBBBO....", "....OOOOOOOOO...",
-                "..OOBLLBBBBBOO..", ".OBLLBBBBBBBBBO.", ".OBLBBBBBBBBBBO.", "OBBBBBBBBBBBBBBO",
-                "OBBBBBBJJBBBBBBO", "OBBBBBBBBBBBBBBO", "OBBBBBBBBBBBBBBO", ".OBBBBBBBBBBBBO.",
-                ".OSBBBBBBBBBSO..", "..OOSSSSSSSSO...", "...OO......OO...", "................",
-            ),
-        )
-
-        /** Nama tampilan untuk pemilih di pengaturan. */
-        val DESIGN_LABELS = linkedMapOf(
-            "SLIME" to "🟢 Slime", "KUCING" to "🐱 Kucing", "KELINCI" to "🐰 Kelinci",
-            "HANTU" to "👻 Hantu", "ANAK_AYAM" to "🐤 Anak Ayam",
-        )
-
         fun emotionFrom(s: String?): Emotion = when (s?.lowercase()) {
             "happy", "senang" -> Emotion.HAPPY
             "sad", "sedih" -> Emotion.SAD

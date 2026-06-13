@@ -35,7 +35,6 @@ import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.TextView
 import com.hermespet.Prefs.moodCheckEnabled
-import com.hermespet.Prefs.petDesign
 import com.hermespet.Prefs.petScale
 import com.hermespet.Prefs.petVoice
 import com.hermespet.Prefs.petX
@@ -52,7 +51,6 @@ class PetOverlayService : Service() {
     companion object {
         @Volatile var instance: PetOverlayService? = null
         const val ACTION_APPLY_SCALE = "com.hermespet.APPLY_SCALE"
-        const val ACTION_APPLY_DESIGN = "com.hermespet.APPLY_DESIGN"
 
         private const val BASE_SIZE_DP = 96
         private const val TICK_MS = 60_000L
@@ -116,7 +114,6 @@ class PetOverlayService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (intent?.action == ACTION_APPLY_SCALE) applyScale()
-        if (intent?.action == ACTION_APPLY_DESIGN) pet.design = petDesign
         return START_STICKY
     }
 
@@ -135,7 +132,7 @@ class PetOverlayService : Service() {
     // ---------------------------------------------------------------- overlay
 
     private fun buildOverlay() {
-        pet = PetView(this).apply { design = petDesign }
+        pet = PetView(this)
         // pet di window-nya sendiri (kecil, fixed) — supaya gerak/drag mulus
         root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
