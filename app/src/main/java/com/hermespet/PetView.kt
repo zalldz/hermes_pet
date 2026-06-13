@@ -34,24 +34,24 @@ class PetView(context: Context) : View(context) {
             if (v) post(animator) else removeCallbacks(animator)
         }
 
-    // sprite slime 16x16: O outline, B badan, L kilau, S bayangan
+    // sprite slime ala Stardew Valley (berantena) 16x16: O outline, B badan, L kilau, S bayangan
     private val base = arrayOf(
-        ".....OOOOOO.....",
-        "...OOBBBBBBOO...",
-        "..OBBBBBBBBBBO..",
+        ".......OO.......",
+        "......OBBO......",
+        ".......OO.......",
+        "....OOOOOOOO....",
+        "..OOBLLBBBBBOO..",
         ".OBLLBBBBBBBBBO.",
-        ".OLLLBBBBBBBBBO.",
-        "OBLLBBBBBBBBBBBO",
-        "OBLBBBBBBBBBBBBO",
-        "OBBBBBBBBBBBBBBO",
+        ".OBLBBBBBBBBBBO.",
         "OBBBBBBBBBBBBBBO",
         "OBBBBBBBBBBBBBBO",
         "OBBBBBBBBBBBBBBO",
         "OBBBBBBBBBBBBSBO",
-        ".OBBBBBBBBBSSBO.",
-        ".OSBBBBBBSSSSBO.",
-        "..OOSSSSSSSSOO..",
-        "....OOOOOOOO....",
+        "OBBBBBBBBBBSSSBO",
+        ".OSBBBBBBSSSSSO.",
+        ".OSSSSSSSSSSSSO.",
+        "..OOOOOOOOOOOO..",
+        "................",
     )
 
     // warna per-mood: [body, light, shade, outline]. Identitas slime = BIRU ceria;
