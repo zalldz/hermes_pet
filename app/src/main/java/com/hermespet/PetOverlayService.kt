@@ -497,13 +497,15 @@ class PetOverlayService : Service() {
     }
 
     /** Hasil tangkap layar dari ScreenCaptureService. */
-    fun onScreenCaptured(imageB64: String?, question: String) = handler.post {
-        if (imageB64 == null) {
-            say("Yah, gagal lihat layarnya 😖", PetView.Emotion.SAD)
-            return@handler
+    fun onScreenCaptured(imageB64: String?, question: String) {
+        handler.post {
+            if (imageB64 == null) {
+                say("Yah, gagal lihat layarnya 😖", PetView.Emotion.SAD)
+            } else {
+                say("🤔 Mengamati...", null)
+                Brain.askVision(this, question, imageB64) { reply -> applyReply("vision", reply) }
+            }
         }
-        say("🤔 Mengamati...", null)
-        Brain.askVision(this, question, imageB64) { reply -> applyReply("vision", reply) }
     }
 
     /** Dipanggil ReminderReceiver saat pengingat tiba & pet sedang hidup. */
