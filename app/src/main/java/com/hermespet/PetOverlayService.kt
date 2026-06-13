@@ -72,6 +72,7 @@ class PetOverlayService : Service() {
     private var pausedUntil = 0L
     private var posX = 0f
     private var speed = 0f
+    private var currentGait = "SLIDE"
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -402,20 +403,24 @@ class PetOverlayService : Service() {
             if (now >= pausedUntil) {
                 val dist = walkTargetX - posX
                 if (walkTargetX < 0 || abs(dist) < 4f) {
-                    // sampai tujuan → istirahat, lalu pilih tujuan baru
+                    // sampai tujuan → istirahat lebih lama, lalu pilih tujuan & gaya baru
                     walkTargetX = Random.nextInt(0, maxX)
-                    pausedUntil = now + Random.nextLong(3_000, 15_000)
+                    pausedUntil = now + Random.nextLong(5_000, 18_000)
+                    // lebih sering meluncur (ozing), jarang melompat
+                    currentGait = if (Random.nextFloat() < 0.7f) "SLIDE" else "HOP"
                     pet.walking = false
+                    pet.gait = "IDLE"
                     speed = 0f
                 } else {
                     val dir = if (dist > 0) 1 else -1
-                    // easing: melambat mendekati tujuan, akselerasi halus saat mulai
-                    val maxSpeed = 2.2f * petScale
-                    val targetSpeed = minOf(maxSpeed, abs(dist) / 25f).coerceAtLeast(0.5f)
-                    speed += (targetSpeed - speed) * 0.07f
+                    // meluncur lebih pelan & mengalir; melompat sedikit lebih cepat
+                    val maxSpeed = (if (currentGait == "SLIDE") 1.5f else 2.2f) * petScale
+                    val targetSpeed = minOf(maxSpeed, abs(dist) / 25f).coerceAtLeast(0.4f)
+                    speed += (targetSpeed - speed) * 0.06f
                     posX = (posX + dir * speed).coerceIn(0f, maxX.toFloat())
                     pet.facing = dir
                     pet.walking = true
+                    pet.gait = currentGait
                     if (lp.x != posX.toInt()) {
                         lp.x = posX.toInt()
                         runCatching { wm.updateViewLayout(root, lp) }
@@ -424,6 +429,7 @@ class PetOverlayService : Service() {
                 }
             } else {
                 pet.walking = false
+                pet.gait = "IDLE"
                 speed = 0f
             }
             handler.postDelayed(this, WALK_FRAME_MS)

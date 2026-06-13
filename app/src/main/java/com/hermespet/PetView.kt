@@ -23,6 +23,9 @@ class PetView(context: Context) : View(context) {
     var walking: Boolean = false
     var facing: Int = 1
 
+    /** Cara bergerak: IDLE diam, SLIDE meluncur/oozing rendah, HOP melompat. */
+    var gait: String = "IDLE"
+
     /** Hidupkan/matikan animasi — dipakai untuk hemat baterai saat layar mati. */
     var awake: Boolean = true
         set(v) {
@@ -51,13 +54,14 @@ class PetView(context: Context) : View(context) {
         "....OOOOOOOO....",
     )
 
-    // warna per-mood: [body, light, shade, outline]
+    // warna per-mood: [body, light, shade, outline]. Identitas slime = BIRU ceria;
+    // sedih jadi biru lebih kelam & kusam supaya tetap beda.
     private fun palette(e: Emotion): IntArray = when (e) {
-        Emotion.SAD -> intArrayOf(0xFF6FB7E8.toInt(), 0xFFB3DEF7.toInt(), 0xFF3E84B5.toInt(), 0xFF244B66.toInt())
+        Emotion.SAD -> intArrayOf(0xFF6E86AE.toInt(), 0xFFAEC0DC.toInt(), 0xFF4A5E80.toInt(), 0xFF2A3852.toInt())
         Emotion.ANGRY -> intArrayOf(0xFFE8736B.toInt(), 0xFFF7B0AB.toInt(), 0xFFB5443E.toInt(), 0xFF6B2420.toInt())
         Emotion.LOVE -> intArrayOf(0xFFFF9EC4.toInt(), 0xFFFFD0E4.toInt(), 0xFFD45F92.toInt(), 0xFF7A2E50.toInt())
         Emotion.SLEEPY -> intArrayOf(0xFFA99BE0.toInt(), 0xFFD6CCF5.toInt(), 0xFF6F5FB0.toInt(), 0xFF3A2E66.toInt())
-        else -> intArrayOf(0xFF7EDB63.toInt(), 0xFFB6F09C.toInt(), 0xFF4FA63E.toInt(), 0xFF2B4A23.toInt())
+        else -> intArrayOf(0xFF4FC3F7.toInt(), 0xFFBEEBFF.toInt(), 0xFF2A9BD4.toInt(), 0xFF15577A.toInt())
     }
 
     // warna saat ini (di-lerp menuju target tiap frame) → transisi mulus
@@ -134,34 +138,39 @@ class PetView(context: Context) : View(context) {
         for (i in cur.indices) cur[i] = lerp(cur[i], target[i], 0.12f)
         body.color = cur[0]; light.color = cur[1]; shade.color = cur[2]; outline.color = cur[3]
 
-        // --- gerak slime natural: antisipasi → lompat → puncak → mendarat ---
-        // Mengikuti prinsip squash&stretch: mendekam (anticipation), melonjak
-        // sambil memanjang (stretch di puncak), lalu gepeng saat mendarat (squash),
-        // dengan bagian atas terlambat mengikuti (overlap/gooey).
-        val bobPx: Float
-        val squashSigned: Float // + = gepeng melebar, - = memanjang ke atas
-        if (walking) {
-            // satu siklus lompatan: t 0..1
-            val t = (phase * 0.5f) % 1f
-            // tinggi: busur lompatan (0 di tanah, puncak di tengah siklus)
-            val arc = sin((t.coerceIn(0f, 1f)) * Math.PI.toFloat())
-            bobPx = arc * cell * 1.7f
-            squashSigned = when {
-                t < 0.16f -> (0.16f - t) / 0.16f * 0.18f          // antisipasi: mendekam
-                t > 0.84f -> (t - 0.84f) / 0.16f * 0.22f          // mendarat: gepeng kuat
-                else -> -arc * 0.10f                              // di udara: memanjang
+        // --- gerak slime: bervariasi (IDLE / SLIDE meluncur / HOP melompat) ---
+        var bobPx: Float
+        var squashSigned: Float // + = gepeng melebar, - = memanjang ke atas
+        var shear: Float
+        when (gait) {
+            "HOP" -> {
+                // siklus lompatan: meleleh dulu (mendekam) → melonjak memanjang → mendarat gepeng
+                val t = (phase * 0.42f) % 1f
+                val arc = sin(t.coerceIn(0f, 1f) * Math.PI.toFloat())
+                bobPx = arc * cell * 1.7f
+                squashSigned = when {
+                    t < 0.22f -> (0.22f - t) / 0.22f * 0.24f      // mencair/mendekam (anticipation)
+                    t > 0.86f -> (t - 0.86f) / 0.14f * 0.22f      // mendarat: gepeng
+                    else -> -arc * 0.10f                          // di udara: memanjang
+                }
+                shear = facing * 0.035f                          // condong tipis ke arah lompat
             }
-        } else {
-            // diam: napas lembut + sesekali bergoyang kenyal
-            val b = (sin(phase * 0.5f) + 1f) * 0.5f
-            bobPx = b * cell * 0.4f
-            squashSigned = (1f - b) * 0.06f + sin(phase * 1.4f) * 0.018f
+            "SLIDE" -> {
+                // meluncur/oozing: tetap rendah & agak gepeng, riak halus, condong maju
+                bobPx = (sin(phase * 1.1f) + 1f) * 0.5f * cell * 0.18f
+                squashSigned = 0.11f + sin(phase * 2.0f) * 0.025f
+                shear = facing * 0.11f + sin(phase * 1.3f) * 0.015f // condong maju (seperti mengalir)
+            }
+            else -> {
+                // diam: napas lembut + goyangan SANGAT kalem
+                val b = (sin(phase * 0.5f) + 1f) * 0.5f
+                bobPx = b * cell * 0.35f
+                squashSigned = (1f - b) * 0.05f
+                shear = sin(phase * 1.2f) * 0.018f               // gooey dikurangi → lebih kalem
+            }
         }
         val sx = 1f + squashSigned
         val sy = 1f - squashSigned
-
-        // overlap/gooey: bagian atas condong terlambat (shear berosilasi + arah jalan)
-        val shear = sin(phase * 1.5f) * 0.045f + (if (walking) facing * 0.05f else 0f)
 
         val baseY = offY + cell * 15.5f // titik tumpu di kaki slime
 
@@ -195,25 +204,26 @@ class PetView(context: Context) : View(context) {
             }
         }
 
+        // mata BESAR: 3 piksel lebar (kiri cols 3-5, kanan cols 10-12)
         val sleepy = emotion == Emotion.SLEEPY
         when {
             blink || sleepy -> {
-                px(canvas, 4, 8, eye); px(canvas, 5, 8, eye)
-                px(canvas, 10, 8, eye); px(canvas, 11, 8, eye)
+                for (c in 3..5) px(canvas, c, 8, eye)
+                for (c in 10..12) px(canvas, c, 8, eye)
             }
             emotion == Emotion.LOVE -> {
                 drawPixelHeart(canvas, 3, 6); drawPixelHeart(canvas, 10, 6)
             }
             else -> {
                 val grow = if (emotion == Emotion.SURPRISED) 1 else 0
-                // mata besar bulat
-                for (r in (6 - grow)..(9 + grow)) {
-                    px(canvas, 4, r, eye); px(canvas, 5, r, eye)
-                    px(canvas, 10, r, eye); px(canvas, 11, r, eye)
+                for (r in (6 - grow)..(10 + grow)) {
+                    for (c in 3..5) px(canvas, c, r, eye)
+                    for (c in 10..12) px(canvas, c, r, eye)
                 }
-                // dua titik kilau tiap mata → efek berbinar
-                px(canvas, 4, 6, white); px(canvas, 10, 6, white)
-                px(canvas, 5, 9, white); px(canvas, 11, 9, white)
+                // dua titik kilau tiap mata → efek berbinar besar
+                px(canvas, 3, 6, white); px(canvas, 4, 6, white)
+                px(canvas, 10, 6, white); px(canvas, 11, 6, white)
+                px(canvas, 5, 9, white); px(canvas, 12, 9, white)
             }
         }
 
