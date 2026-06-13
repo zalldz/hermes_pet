@@ -32,7 +32,6 @@ import com.hermespet.Prefs.petScale
 import com.hermespet.Prefs.petVoice
 import com.hermespet.Prefs.sendMoodImage
 import com.hermespet.Prefs.soulMd
-import com.hermespet.Prefs.tiltReactions
 
 class MainActivity : Activity() {
 
@@ -207,14 +206,6 @@ class MainActivity : Activity() {
             setOnCheckedChangeListener { _, on -> petVoice = on }
         }
         col.addView(voiceSwitch)
-
-        @Suppress("UseSwitchCompatOrMaterialCode")
-        val tiltSwitch = Switch(this).apply {
-            text = "Reaksi miring & guncang HP (giroskop)"
-            isChecked = tiltReactions
-            setOnCheckedChangeListener { _, on -> tiltReactions = on }
-        }
-        col.addView(tiltSwitch)
 
         @Suppress("UseSwitchCompatOrMaterialCode")
         val moodSwitch = Switch(this).apply {
