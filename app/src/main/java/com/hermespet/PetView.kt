@@ -88,6 +88,9 @@ class PetView(context: Context) : View(context) {
     private var impactAxisX = false
     fun bump(axisX: Boolean) { impact = 1f; impactAxisX = axisX; invalidate() }
 
+    /** Condong saat meluncur karena HP dimiringkan (-1..1). 0 = tegak. */
+    var lean = 0f
+
     private val animator = object : Runnable {
         override fun run() {
             phase += 0.13f
@@ -174,6 +177,12 @@ class PetView(context: Context) : View(context) {
 
         canvas.save()
         canvas.translate(0f, -bobPx)
+        // condong saat meluncur (miring HP): atas miring, dasar menempel tanah
+        if (lean != 0f) {
+            canvas.translate(w / 2f, baseY)
+            canvas.skew(lean.coerceIn(-0.4f, 0.4f), 0f)
+            canvas.translate(-w / 2f, -baseY)
+        }
         canvas.scale(sx, sy, w / 2f, baseY)
         if (facing < 0) canvas.scale(-1f, 1f, w / 2f, h / 2f)
 

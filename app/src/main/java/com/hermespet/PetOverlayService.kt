@@ -40,6 +40,7 @@ import com.hermespet.Prefs.petVoice
 import com.hermespet.Prefs.petX
 import com.hermespet.Prefs.petY
 import com.hermespet.Prefs.sendMoodImage
+import com.hermespet.Prefs.tiltReactions
 import org.json.JSONObject
 import java.util.Calendar
 import java.util.Locale
@@ -75,6 +76,11 @@ class PetOverlayService : Service() {
     private var flinging = false
     private var velX = 0f; private var velY = 0f   // px/ms saat lepas tangan
     private var fx = 0f; private var fy = 0f        // posisi float saat melayang
+    // --- giroskop / kemiringan ---
+    private var tiltX = 0f          // komponen gravitasi kiri-kanan (m/s²)
+    private var shakeLevel = 0f
+    private var lastAccelMag = 0f
+    private var lastShakeAt = 0L
     private var hopStart = 0L      // 0 = tidak sedang melompat
     private var hopFrom = 0f
     private var hopDist = 0f
@@ -98,6 +104,7 @@ class PetOverlayService : Service() {
             addAction(Intent.ACTION_SCREEN_OFF)
             addAction(Intent.ACTION_USER_PRESENT)
         })
+        registerTilt()
         handler.post(walkLoop)
         handler.postDelayed(tickLoop, 5_000)
         handler.postDelayed(moodLoop, 20_000) // cek pertama tak lama setelah start
@@ -113,10 +120,11 @@ class PetOverlayService : Service() {
     private val screenReceiver = object : android.content.BroadcastReceiver() {
         override fun onReceive(c: Context?, i: Intent?) {
             when (i?.action) {
-                Intent.ACTION_SCREEN_OFF -> { screenOn = false; pet.awake = false }
+                Intent.ACTION_SCREEN_OFF -> { screenOn = false; pet.awake = false; unregisterTilt() }
                 Intent.ACTION_SCREEN_ON -> {
                     screenOn = true; pet.awake = true
                     pet.emotion = Mood.current(this@PetOverlayService)
+                    registerTilt()
                 }
                 Intent.ACTION_USER_PRESENT -> maybeGreet() // buka kunci → sapa
             }
@@ -145,6 +153,7 @@ class PetOverlayService : Service() {
         instance = null
         handler.removeCallbacksAndMessages(null)
         Senses.stop(this)
+        unregisterTilt()
         tts?.shutdown()
         runCatching { unregisterReceiver(screenReceiver) }
         closeChat()
@@ -438,6 +447,47 @@ class PetOverlayService : Service() {
         velX *= 16f; velY *= 16f
     }
 
+    // ---------------------------------------------------------------- giroskop
+
+    private val accelListener = object : android.hardware.SensorEventListener {
+        override fun onSensorChanged(e: android.hardware.SensorEvent) {
+            val ax = e.values[0]; val ay = e.values[1]; val az = e.values[2]
+            tiltX = ax
+            val mag = kotlin.math.sqrt(ax * ax + ay * ay + az * az)
+            shakeLevel = shakeLevel * 0.9f + kotlin.math.abs(mag - lastAccelMag)
+            lastAccelMag = mag
+            val now = System.currentTimeMillis()
+            if (shakeLevel > 13f && now - lastShakeAt > 1500) {
+                lastShakeAt = now
+                onShaken()
+            }
+        }
+        override fun onAccuracyChanged(s: android.hardware.Sensor?, a: Int) {}
+    }
+
+    private fun registerTilt() {
+        if (!tiltReactions) return
+        val sm = getSystemService(Context.SENSOR_SERVICE) as android.hardware.SensorManager
+        sm.getDefaultSensor(android.hardware.Sensor.TYPE_ACCELEROMETER)?.let {
+            sm.registerListener(accelListener, it, android.hardware.SensorManager.SENSOR_DELAY_GAME)
+        }
+    }
+
+    private fun unregisterTilt() {
+        (getSystemService(Context.SENSOR_SERVICE) as android.hardware.SensorManager)
+            .unregisterListener(accelListener)
+    }
+
+    private fun onShaken() {
+        pet.emotion = PetView.Emotion.SURPRISED
+        transientUntil = System.currentTimeMillis() + 2500
+        say("Wuaa~ pusing! 😵", null)
+        // loncat kaget ke arah acak
+        velX = Random.nextDouble(-0.5, 0.5).toFloat()
+        velY = -0.9f
+        startFling()
+    }
+
     /** Satu langkah fisika lemparan: gravitasi + pantul tepi layar + redam. */
     private fun flingStep() {
         val maxX = (resources.displayMetrics.widthPixels - pet.width).toFloat().coerceAtLeast(1f)
@@ -476,6 +526,25 @@ class PetOverlayService : Service() {
             if (flinging) { flingStep(); handler.postDelayed(this, WALK_FRAME_MS); return }
             val now = System.currentTimeMillis()
             val maxX = (resources.displayMetrics.widthPixels - pet.width).coerceAtLeast(1)
+            // miringkan HP → slime meluncur ke arah bawah (seperti agar-agar di mangkok)
+            if (tiltReactions && abs(tiltX) > 2.2f) {
+                val dir = -tiltX // - karena sumbu accel berlawanan arah miring
+                val v = (abs(tiltX) - 2.2f).coerceAtMost(7f) * 0.5f * petScale
+                posX = (posX + (if (dir > 0) 1 else -1) * v).coerceIn(0f, maxX.toFloat())
+                pet.facing = if (dir > 0) 1 else -1
+                pet.hopT = -1f
+                pet.lean = (-tiltX / 9.8f).coerceIn(-0.35f, 0.35f) // condong ke arah luncur
+                walkTargetX = -1; pausedUntil = now + 800
+                if (lp.x != posX.toInt()) {
+                    lp.x = posX.toInt()
+                    runCatching { wm.updateViewLayout(root, lp) }
+                    if (bubbleShown) positionBubble()
+                }
+                handler.postDelayed(this, WALK_FRAME_MS); return
+            } else if (pet.lean != 0f) {
+                pet.lean *= 0.8f
+                if (abs(pet.lean) < 0.01f) pet.lean = 0f
+            }
             if (now >= pausedUntil) {
                 val dist = walkTargetX - posX
                 when {
