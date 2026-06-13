@@ -35,6 +35,7 @@ import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.TextView
 import com.hermespet.Prefs.moodCheckEnabled
+import com.hermespet.Prefs.musicDance
 import com.hermespet.Prefs.petScale
 import com.hermespet.Prefs.petVoice
 import com.hermespet.Prefs.petX
@@ -102,6 +103,8 @@ class PetOverlayService : Service() {
         handler.postDelayed(tickLoop, 5_000)
         handler.postDelayed(moodLoop, 20_000) // cek pertama tak lama setelah start
         handler.post(moodTick)
+        handler.postDelayed(musicLoop, 3_000)
+        handler.postDelayed(museLoop, 20 * 60_000L)
         pet.emotion = Mood.current(this)
         say("Halo! Aku hidup! 🐾", PetView.Emotion.HAPPY)
         transientUntil = System.currentTimeMillis() + 8_000
@@ -113,7 +116,7 @@ class PetOverlayService : Service() {
     private val screenReceiver = object : android.content.BroadcastReceiver() {
         override fun onReceive(c: Context?, i: Intent?) {
             when (i?.action) {
-                Intent.ACTION_SCREEN_OFF -> { screenOn = false; pet.awake = false }
+                Intent.ACTION_SCREEN_OFF -> { screenOn = false; pet.awake = false; stopVisualizer() }
                 Intent.ACTION_SCREEN_ON -> {
                     screenOn = true; pet.awake = true
                     pet.emotion = Mood.current(this@PetOverlayService)
@@ -145,6 +148,7 @@ class PetOverlayService : Service() {
         instance = null
         handler.removeCallbacksAndMessages(null)
         Senses.stop(this)
+        stopVisualizer()
         tts?.shutdown()
         runCatching { unregisterReceiver(screenReceiver) }
         closeChat()
@@ -304,7 +308,8 @@ class PetOverlayService : Service() {
             setTextColor(Color.parseColor("#3E2723"))
             setHintTextColor(Color.parseColor("#9E9E9E"))
         }
-        val eye = Button(this).apply { text = "👁" } // lihat layar
+        val feed = Button(this).apply { text = "🍬" } // kasih makan
+        val eye = Button(this).apply { text = "👁" }  // lihat layar
         val send = Button(this).apply { text = "➤" }
         val row = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
@@ -315,8 +320,9 @@ class PetOverlayService : Service() {
             }
             val p = dp(6f).toInt()
             setPadding(p, p, p, p)
-            addView(input, LinearLayout.LayoutParams(dp(170f).toInt(),
+            addView(input, LinearLayout.LayoutParams(dp(150f).toInt(),
                 LinearLayout.LayoutParams.WRAP_CONTENT))
+            addView(feed)
             addView(eye)
             addView(send)
         }
@@ -350,6 +356,7 @@ class PetOverlayService : Service() {
             closeChat()
             lookAtScreen(q)
         }
+        feed.setOnClickListener { closeChat(); feedPet() }
 
         wm.addView(row, clp)
         chatView = row
@@ -367,7 +374,19 @@ class PetOverlayService : Service() {
 
     private fun onPoked() {
         pet.emotion = PetView.Emotion.SURPRISED
+        Care.cheer(this)
         sendToBrain("poke", JSONObject())
+    }
+
+    private fun feedPet() {
+        Care.feed(this)
+        pet.emotion = PetView.Emotion.LOVE
+        transientUntil = System.currentTimeMillis() + 4_000
+        pet.bump(false) // gerakan "hap" saat makan
+        val msg = listOf("Nyam nyam! 😋", "Enaak~ makasih! 🥰", "Hap! Kenyang 😊").random()
+        say(msg, null, typewriter = true)
+        speak(msg)
+        PetLog.add(this, "aksi", "diberi makan — ${Care.status(this)}")
     }
 
     // ---------------------------------------------------------------- suara
@@ -557,15 +576,83 @@ class PetOverlayService : Service() {
         }
     }
 
-    // baseline emosi pet mengikuti suasana hati saat idle (tiap 15 detik),
+    // baseline emosi pet mengikuti suasana hati + perawatan saat idle (tiap 15 detik),
     // kecuali sedang menampilkan reaksi sesaat (transientUntil)
     private var transientUntil = 0L
+    private var lastHungerNag = 0L
     private val moodTick = object : Runnable {
         override fun run() {
             if (System.currentTimeMillis() > transientUntil) {
-                pet.emotion = Mood.current(this@PetOverlayService)
+                val base = Mood.current(this@PetOverlayService)
+                // saat mood netral, perawatan (lapar/bosan) yang menentukan ekspresi
+                pet.emotion = if (base == PetView.Emotion.NEUTRAL)
+                    (Care.moodHint(this@PetOverlayService) ?: base) else base
+            }
+            // rengekan lapar (tanpa API), maksimal tiap 30 menit
+            val now = System.currentTimeMillis()
+            if (Care.veryHungry(this@PetOverlayService) && now - lastHungerNag > 30 * 60_000L) {
+                lastHungerNag = now
+                val m = "Perutku keroncongan, kasih makan dong 🥺"
+                say(m, PetView.Emotion.SAD, typewriter = true); speak(m)
             }
             handler.postDelayed(this, 15_000)
+        }
+    }
+
+    // --- goyang ikut musik (#6): Visualizer hanya saat ada musik & layar nyala ---
+    private var visualizer: android.media.audiofx.Visualizer? = null
+    private val musicLoop = object : Runnable {
+        override fun run() {
+            val am = getSystemService(Context.AUDIO_SERVICE) as android.media.AudioManager
+            val want = musicDance && screenOn && am.isMusicActive
+            if (want && visualizer == null) startVisualizer()
+            else if (!want && visualizer != null) stopVisualizer()
+            handler.postDelayed(this, 2_000)
+        }
+    }
+
+    private fun startVisualizer() {
+        try {
+            visualizer = android.media.audiofx.Visualizer(0).apply {
+                captureSize = android.media.audiofx.Visualizer.getCaptureSizeRange()[0]
+                setDataCaptureListener(
+                    object : android.media.audiofx.Visualizer.OnDataCaptureListener {
+                        override fun onWaveFormDataCapture(v: android.media.audiofx.Visualizer?, wave: ByteArray?, rate: Int) {
+                            wave ?: return
+                            var sum = 0L
+                            for (b in wave) { val a = (b.toInt() and 0xFF) - 128; sum += (a * a).toLong() }
+                            val rms = kotlin.math.sqrt(sum.toDouble() / wave.size) / 128.0
+                            val energy = ((rms - 0.04) * 3.2).coerceIn(0.0, 1.0).toFloat()
+                            if (energy > pet.beat) pet.beat = energy
+                        }
+                        override fun onFftDataCapture(v: android.media.audiofx.Visualizer?, fft: ByteArray?, rate: Int) {}
+                    },
+                    android.media.audiofx.Visualizer.getMaxCaptureRate() / 2, true, false)
+                enabled = true
+            }
+        } catch (e: Exception) { visualizer = null }
+    }
+
+    private fun stopVisualizer() {
+        runCatching { visualizer?.enabled = false; visualizer?.release() }
+        visualizer = null
+        pet.beat = 0f
+    }
+
+    // --- ungkit obrolan/ingatan lama (#7): sesekali, dengan cooldown panjang ---
+    private var lastMuseAt = 0L
+    private val museLoop = object : Runnable {
+        override fun run() {
+            val now = System.currentTimeMillis()
+            val recentlySeen = now - Mood.lastSeen(this@PetOverlayService) < 10 * 60_000L
+            if (screenOn && recentlySeen && now - lastMuseAt > 3 * 3_600_000L &&
+                Random.nextFloat() < 0.4f) {
+                Memory.randomMemory(this@PetOverlayService)?.let { mem ->
+                    lastMuseAt = now
+                    sendToBrain("muse", JSONObject().put("memory", mem))
+                }
+            }
+            handler.postDelayed(this, 30 * 60_000L)
         }
     }
 
@@ -623,7 +710,7 @@ class PetOverlayService : Service() {
 
     private fun sendToBrain(type: String, data: JSONObject) {
         // interaksi langsung memperbarui "kapan terakhir disapa" (anti-kesepian)
-        if (type == "chat" || type == "poke") Mood.noteInteraction(this)
+        if (type == "chat" || type == "poke") { Mood.noteInteraction(this); Care.cheer(this) }
         Brain.sendEvent(this, type, data) { reply -> applyReply(type, reply) }
     }
 

@@ -88,10 +88,14 @@ class PetView(context: Context) : View(context) {
     private var impactAxisX = false
     fun bump(axisX: Boolean) { impact = 1f; impactAxisX = axisX; invalidate() }
 
+    /** Energi musik 0..1 → slime ikut bergoyang (di-set service dari Visualizer). */
+    var beat = 0f
+
     private val animator = object : Runnable {
         override fun run() {
             phase += 0.13f
             if (impact > 0.01f) impact *= 0.82f else impact = 0f
+            if (beat > 0.01f) beat *= 0.86f else beat = 0f // luruh antar-ketukan
             val now = System.currentTimeMillis()
             if (now > nextBlinkAt) {
                 blink = !blink
@@ -158,6 +162,10 @@ class PetView(context: Context) : View(context) {
                 t > 0.85f -> (t - 0.85f) / 0.15f * 0.18f   // gepeng saat mendarat
                 else -> -arc * 0.08f                        // memanjang tipis di udara
             }
+        } else if (beat > 0.02f) {
+            // berjoget mengikuti musik: memantul & sedikit gepeng sesuai energi
+            bobPx = beat * cell * 1.3f
+            squashSigned = -beat * 0.10f + sin(phase * 0.8f) * 0.03f
         } else {
             // denyut idle khas slime Stardew — dasar tetap MENEMPEL tanah
             bobPx = 0f

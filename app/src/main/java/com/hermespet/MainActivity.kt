@@ -28,6 +28,7 @@ import com.hermespet.Prefs.visionModel
 import com.hermespet.Prefs.latitude
 import com.hermespet.Prefs.longitude
 import com.hermespet.Prefs.moodCheckEnabled
+import com.hermespet.Prefs.musicDance
 import com.hermespet.Prefs.petScale
 import com.hermespet.Prefs.petVoice
 import com.hermespet.Prefs.sendMoodImage
@@ -206,6 +207,19 @@ class MainActivity : Activity() {
             setOnCheckedChangeListener { _, on -> petVoice = on }
         }
         col.addView(voiceSwitch)
+
+        @Suppress("UseSwitchCompatOrMaterialCode")
+        val danceSwitch = Switch(this).apply {
+            text = "Slime berjoget saat ada musik 🎵"
+            isChecked = musicDance
+            setOnCheckedChangeListener { _, on -> musicDance = on }
+        }
+        col.addView(danceSwitch)
+
+        col.addView(TextView(this).apply {
+            text = Care.status(this@MainActivity) + "  (kasih makan 🍬 lewat menu chat)"
+            setPadding(0, 8, 0, 8)
+        })
 
         @Suppress("UseSwitchCompatOrMaterialCode")
         val moodSwitch = Switch(this).apply {

@@ -57,6 +57,24 @@ object Prefs {
         get() = sp(this).getBoolean("pet_voice", true)
         set(v) = sp(this).edit().putBoolean("pet_voice", v).apply()
 
+    // --- rawat ala Tamagotchi ([[Care]]) ---
+    var Context.hunger: Float
+        get() = sp(this).getFloat("hunger", 75f)
+        set(v) = sp(this).edit().putFloat("hunger", v.coerceIn(0f, 100f)).apply()
+
+    var Context.happiness: Float
+        get() = sp(this).getFloat("happiness", 75f)
+        set(v) = sp(this).edit().putFloat("happiness", v.coerceIn(0f, 100f)).apply()
+
+    var Context.lastCareUpdate: Long
+        get() = sp(this).getLong("last_care", System.currentTimeMillis())
+        set(v) = sp(this).edit().putLong("last_care", v).apply()
+
+    /** Slime ikut bergoyang saat ada musik. */
+    var Context.musicDance: Boolean
+        get() = sp(this).getBoolean("music_dance", true)
+        set(v) = sp(this).edit().putBoolean("music_dance", v).apply()
+
     var Context.moodCheckEnabled: Boolean
         get() = sp(this).getBoolean("mood_enabled", false)
         set(v) = sp(this).edit().putBoolean("mood_enabled", v).apply()

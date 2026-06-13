@@ -108,6 +108,16 @@ object Memory {
         }
     }
 
+    /** Satu ingatan acak (berbobot kepentingan) untuk diungkit pet. null = kosong. */
+    fun randomMemory(ctx: Context): String? {
+        val mems = all(ctx)
+        if (mems.isEmpty()) return null
+        val total = mems.sumOf { it.importance }
+        var r = Math.random() * total
+        for (m in mems) { r -= m.importance; if (r <= 0) return m.text }
+        return mems.last().text
+    }
+
     // ------------------------------------------------------------- recall
 
     fun recall(ctx: Context, query: String, k: Int, onResult: (List<String>) -> Unit) {
