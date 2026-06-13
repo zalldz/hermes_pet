@@ -109,7 +109,6 @@ object Brain {
             "poke" -> handlePoke(ctx, onReply)
             "chat" -> handleChat(ctx, data, onReply)
             "greet" -> handleGreet(ctx, data, onReply)
-            "muse" -> handleMuse(ctx, data, onReply)
             else -> onReply(null)
         }
     }
@@ -278,14 +277,6 @@ object Brain {
             "Pemilikmu baru membuka HP setelah $away menit. Sekarang waktu $waktu (jam $hour). " +
                 "Sapa dia duluan dengan hangat & singkat, sesuai waktu.",
             fallback, if (waktu == "malam") "sleepy" else "happy", onReply)
-    }
-
-    private fun handleMuse(ctx: Context, data: JSONObject, onReply: (JSONObject?) -> Unit) {
-        val memory = data.optString("memory")
-        askHermes(ctx,
-            "Kamu teringat sesuatu tentang pemilikmu: \"$memory\". Ungkit dengan santai & " +
-                "perhatian, seolah baru kepikiran — tanyakan kabarnya atau kelanjutannya. Singkat.",
-            "Eh, aku jadi keinget: $memory 🤔", "happy", onReply)
     }
 
     private fun handlePoke(ctx: Context, onReply: (JSONObject?) -> Unit) {

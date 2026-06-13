@@ -104,7 +104,6 @@ class PetOverlayService : Service() {
         handler.postDelayed(moodLoop, 20_000) // cek pertama tak lama setelah start
         handler.post(moodTick)
         handler.postDelayed(musicLoop, 3_000)
-        handler.postDelayed(museLoop, 20 * 60_000L)
         pet.emotion = Mood.current(this)
         say("Halo! Aku hidup! 🐾", PetView.Emotion.HAPPY)
         transientUntil = System.currentTimeMillis() + 8_000
@@ -637,23 +636,6 @@ class PetOverlayService : Service() {
         runCatching { visualizer?.enabled = false; visualizer?.release() }
         visualizer = null
         pet.beat = 0f
-    }
-
-    // --- ungkit obrolan/ingatan lama (#7): sesekali, dengan cooldown panjang ---
-    private var lastMuseAt = 0L
-    private val museLoop = object : Runnable {
-        override fun run() {
-            val now = System.currentTimeMillis()
-            val recentlySeen = now - Mood.lastSeen(this@PetOverlayService) < 10 * 60_000L
-            if (screenOn && recentlySeen && now - lastMuseAt > 3 * 3_600_000L &&
-                Random.nextFloat() < 0.4f) {
-                Memory.randomMemory(this@PetOverlayService)?.let { mem ->
-                    lastMuseAt = now
-                    sendToBrain("muse", JSONObject().put("memory", mem))
-                }
-            }
-            handler.postDelayed(this, 30 * 60_000L)
-        }
     }
 
     fun onNotificationSeen(pkg: String, title: String, text: String) {
