@@ -20,11 +20,13 @@ class PetView(context: Context) : View(context) {
     var emotion: Emotion = Emotion.NEUTRAL
         set(v) { field = v; invalidate() }
 
-    var walking: Boolean = false
     var facing: Int = 1
 
-    /** Cara bergerak: IDLE diam, SLIDE meluncur/oozing rendah, HOP melompat. */
-    var gait: String = "IDLE"
+    /**
+     * Fase lompatan ala slime Stardew, di-set service tiap frame:
+     * -1 = diam (denyut pelan), 0..1 = siklus lompat (mendekam→melayang→mendarat).
+     */
+    var hopT: Float = -1f
 
     /** Hidupkan/matikan animasi — dipakai untuk hemat baterai saat layar mati. */
     var awake: Boolean = true
@@ -76,7 +78,6 @@ class PetView(context: Context) : View(context) {
     private val heart = Paint().apply { color = Color.parseColor("#FF5D8F") }
     private val tear = Paint().apply { color = Color.parseColor("#7EC8E3") }
     private val angryC = Paint().apply { color = Color.parseColor("#C62828") }
-    private val shadow = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#332A2A35") }
 
     private var phase = 0f
     private var blink = false
@@ -138,58 +139,31 @@ class PetView(context: Context) : View(context) {
         for (i in cur.indices) cur[i] = lerp(cur[i], target[i], 0.12f)
         body.color = cur[0]; light.color = cur[1]; shade.color = cur[2]; outline.color = cur[3]
 
-        // --- gerak slime: bervariasi (IDLE / SLIDE meluncur / HOP melompat) ---
-        var bobPx: Float
-        var squashSigned: Float // + = gepeng melebar, - = memanjang ke atas
-        var shear: Float
-        when (gait) {
-            "HOP" -> {
-                // siklus lompatan: meleleh dulu (mendekam) → melonjak memanjang → mendarat gepeng
-                val t = (phase * 0.42f) % 1f
-                val arc = sin(t.coerceIn(0f, 1f) * Math.PI.toFloat())
-                bobPx = arc * cell * 1.7f
-                squashSigned = when {
-                    t < 0.22f -> (0.22f - t) / 0.22f * 0.24f      // mencair/mendekam (anticipation)
-                    t > 0.86f -> (t - 0.86f) / 0.14f * 0.22f      // mendarat: gepeng
-                    else -> -arc * 0.10f                          // di udara: memanjang
-                }
-                shear = facing * 0.035f                          // condong tipis ke arah lompat
+        // --- gerak ala slime Stardew Valley: diam = denyut pelan menempel tanah;
+        // lompat = mendekam → busur → mendarat gepeng. Tanpa bayangan, tanpa shear.
+        val bobPx: Float
+        val squashSigned: Float // + = gepeng melebar, - = memanjang ke atas
+        if (hopT in 0f..1f) {
+            val t = hopT
+            val arc = sin(t * Math.PI.toFloat())
+            bobPx = arc * cell * 1.4f
+            squashSigned = when {
+                t < 0.18f -> (0.18f - t) / 0.18f * 0.16f   // mendekam sebelum lompat
+                t > 0.85f -> (t - 0.85f) / 0.15f * 0.18f   // gepeng saat mendarat
+                else -> -arc * 0.08f                        // memanjang tipis di udara
             }
-            "SLIDE" -> {
-                // meluncur/oozing: tetap rendah & agak gepeng, riak halus, condong maju
-                bobPx = (sin(phase * 1.1f) + 1f) * 0.5f * cell * 0.18f
-                squashSigned = 0.11f + sin(phase * 2.0f) * 0.025f
-                shear = facing * 0.11f + sin(phase * 1.3f) * 0.015f // condong maju (seperti mengalir)
-            }
-            else -> {
-                // diam: napas lembut + goyangan SANGAT kalem
-                val b = (sin(phase * 0.5f) + 1f) * 0.5f
-                bobPx = b * cell * 0.35f
-                squashSigned = (1f - b) * 0.05f
-                shear = sin(phase * 1.2f) * 0.018f               // gooey dikurangi → lebih kalem
-            }
+        } else {
+            // denyut idle khas slime Stardew — dasar tetap MENEMPEL tanah
+            bobPx = 0f
+            squashSigned = sin(phase * 0.8f) * 0.045f
         }
         val sx = 1f + squashSigned
         val sy = 1f - squashSigned
-
-        val baseY = offY + cell * 15.5f // titik tumpu di kaki slime
-
-        // bayangan memantul: melebar & pekat saat menyentuh tanah, mengecil saat melompat
-        val onGround = (1f - (bobPx / (cell * 1.7f))).coerceIn(0f, 1f)
-        val shadowHalf = cell * (4.2f + onGround * 2.3f)
-        shadow.alpha = (45 + onGround * 55).toInt().coerceIn(0, 255)
-        canvas.drawOval(
-            w / 2f - shadowHalf, baseY + cell * 0.2f,
-            w / 2f + shadowHalf, baseY + cell * 1.4f, shadow
-        )
+        val baseY = offY + cell * 15f // dasar sprite = "tanah"
 
         canvas.save()
         canvas.translate(0f, -bobPx)
-        // shear di sekitar kaki → atas bergoyang, dasar menempel (efek gooey)
-        canvas.translate(w / 2f, baseY)
-        canvas.skew(shear, 0f)
-        canvas.translate(-w / 2f, -baseY)
-        canvas.scale(sx, sy, w / 2f, baseY) // gepeng = melebar, lonjak = memanjang
+        canvas.scale(sx, sy, w / 2f, baseY)
         if (facing < 0) canvas.scale(-1f, 1f, w / 2f, h / 2f)
 
         for (r in base.indices) {
@@ -204,26 +178,23 @@ class PetView(context: Context) : View(context) {
             }
         }
 
-        // mata BESAR: 3 piksel lebar (kiri cols 3-5, kanan cols 10-12)
+        // mata proporsional khas Stardew (2 piksel lebar) — ekspresi tetap terbaca
         val sleepy = emotion == Emotion.SLEEPY
         when {
             blink || sleepy -> {
-                for (c in 3..5) px(canvas, c, 8, eye)
-                for (c in 10..12) px(canvas, c, 8, eye)
+                px(canvas, 4, 8, eye); px(canvas, 5, 8, eye)
+                px(canvas, 10, 8, eye); px(canvas, 11, 8, eye)
             }
             emotion == Emotion.LOVE -> {
                 drawPixelHeart(canvas, 3, 6); drawPixelHeart(canvas, 10, 6)
             }
             else -> {
                 val grow = if (emotion == Emotion.SURPRISED) 1 else 0
-                for (r in (6 - grow)..(10 + grow)) {
-                    for (c in 3..5) px(canvas, c, r, eye)
-                    for (c in 10..12) px(canvas, c, r, eye)
+                for (r in (6 - grow)..(9 + grow)) {
+                    px(canvas, 4, r, eye); px(canvas, 5, r, eye)
+                    px(canvas, 10, r, eye); px(canvas, 11, r, eye)
                 }
-                // dua titik kilau tiap mata → efek berbinar besar
-                px(canvas, 3, 6, white); px(canvas, 4, 6, white)
-                px(canvas, 10, 6, white); px(canvas, 11, 6, white)
-                px(canvas, 5, 9, white); px(canvas, 12, 9, white)
+                px(canvas, 4, 6, white); px(canvas, 10, 6, white)
             }
         }
 

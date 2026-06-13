@@ -71,8 +71,11 @@ class PetOverlayService : Service() {
     private var walkTargetX = -1
     private var pausedUntil = 0L
     private var posX = 0f
-    private var speed = 0f
-    private var currentGait = "SLIDE"
+    private var hopStart = 0L      // 0 = tidak sedang melompat
+    private var hopFrom = 0f
+    private var hopDist = 0f
+    private var nextHopAt = 0L
+    private val hopDurMs = 520L
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -402,35 +405,50 @@ class PetOverlayService : Service() {
             val maxX = (resources.displayMetrics.widthPixels - pet.width).coerceAtLeast(1)
             if (now >= pausedUntil) {
                 val dist = walkTargetX - posX
-                if (walkTargetX < 0 || abs(dist) < 4f) {
-                    // sampai tujuan → istirahat lebih lama, lalu pilih tujuan & gaya baru
-                    walkTargetX = Random.nextInt(0, maxX)
-                    pausedUntil = now + Random.nextLong(5_000, 18_000)
-                    // lebih sering meluncur (ozing), jarang melompat
-                    currentGait = if (Random.nextFloat() < 0.7f) "SLIDE" else "HOP"
-                    pet.walking = false
-                    pet.gait = "IDLE"
-                    speed = 0f
-                } else {
-                    val dir = if (dist > 0) 1 else -1
-                    // meluncur lebih pelan & mengalir; melompat sedikit lebih cepat
-                    val maxSpeed = (if (currentGait == "SLIDE") 1.5f else 2.2f) * petScale
-                    val targetSpeed = minOf(maxSpeed, abs(dist) / 25f).coerceAtLeast(0.4f)
-                    speed += (targetSpeed - speed) * 0.06f
-                    posX = (posX + dir * speed).coerceIn(0f, maxX.toFloat())
-                    pet.facing = dir
-                    pet.walking = true
-                    pet.gait = currentGait
-                    if (lp.x != posX.toInt()) {
-                        lp.x = posX.toInt()
-                        runCatching { wm.updateViewLayout(root, lp) }
-                        if (bubbleShown) positionBubble()
+                when {
+                    walkTargetX < 0 || abs(dist) < 8f -> {
+                        // sampai tujuan → istirahat (denyut idle), lalu pilih tujuan baru
+                        walkTargetX = Random.nextInt(0, maxX)
+                        pausedUntil = now + Random.nextLong(4_000, 15_000)
+                        hopStart = 0L
+                        pet.hopT = -1f
+                    }
+                    hopStart == 0L -> {
+                        // menunggu giliran lompat berikutnya (khas Stardew: hop-jeda-hop)
+                        pet.hopT = -1f
+                        if (now >= nextHopAt) {
+                            hopStart = now
+                            hopFrom = posX
+                            hopDist = minOf(abs(dist),
+                                Random.nextLong(40, 110).toFloat() * petScale)
+                            pet.facing = if (dist > 0) 1 else -1
+                        }
+                    }
+                    else -> {
+                        val t = (now - hopStart) / hopDurMs.toFloat()
+                        if (t >= 1f) {
+                            // mendarat sempurna; jeda singkat sebelum lompat lagi
+                            posX = (hopFrom + pet.facing * hopDist).coerceIn(0f, maxX.toFloat())
+                            hopStart = 0L
+                            nextHopAt = now + Random.nextLong(150, 650)
+                            pet.hopT = -1f
+                        } else {
+                            pet.hopT = t
+                            // bergeser horizontal HANYA saat melayang (setelah mendekam)
+                            val air = ((t - 0.18f) / 0.67f).coerceIn(0f, 1f)
+                            posX = (hopFrom + pet.facing * hopDist * air)
+                                .coerceIn(0f, maxX.toFloat())
+                        }
+                        if (lp.x != posX.toInt()) {
+                            lp.x = posX.toInt()
+                            runCatching { wm.updateViewLayout(root, lp) }
+                            if (bubbleShown) positionBubble()
+                        }
                     }
                 }
             } else {
-                pet.walking = false
-                pet.gait = "IDLE"
-                speed = 0f
+                hopStart = 0L
+                pet.hopT = -1f
             }
             handler.postDelayed(this, WALK_FRAME_MS)
         }
