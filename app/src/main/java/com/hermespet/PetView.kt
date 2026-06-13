@@ -123,7 +123,9 @@ class PetView(context: Context) : View(context) {
     override fun onDraw(canvas: Canvas) {
         val w = width.toFloat()
         val h = height.toFloat()
-        cell = minOf(w, h) / 16f
+        // sprite hanya mengisi ~66% View → sisakan ruang (4 sel tiap sisi) agar
+        // squash/stretch/condong/lompat tidak terpotong tepi (penyebab "kepotong")
+        cell = minOf(w, h) / 24f
         offX = (w - cell * 16f) / 2f
         offY = (h - cell * 16f) / 2f
 
@@ -132,36 +134,53 @@ class PetView(context: Context) : View(context) {
         for (i in cur.indices) cur[i] = lerp(cur[i], target[i], 0.12f)
         body.color = cur[0]; light.color = cur[1]; shade.color = cur[2]; outline.color = cur[3]
 
-        // --- gerak jelly kenyal: bob + squash&stretch (volume terjaga) + goyang ---
+        // --- gerak slime natural: antisipasi → lompat → puncak → mendarat ---
+        // Mengikuti prinsip squash&stretch: mendekam (anticipation), melonjak
+        // sambil memanjang (stretch di puncak), lalu gepeng saat mendarat (squash),
+        // dengan bagian atas terlambat mengikuti (overlap/gooey).
         val bobPx: Float
-        val land: Float // 0..1, 1 = menyentuh tanah (paling gepeng)
+        val squashSigned: Float // + = gepeng melebar, - = memanjang ke atas
         if (walking) {
-            val hop = kotlin.math.abs(sin(phase * 2.1f))
-            bobPx = hop * cell * 1.6f
-            land = 1f - hop
+            // satu siklus lompatan: t 0..1
+            val t = (phase * 0.5f) % 1f
+            // tinggi: busur lompatan (0 di tanah, puncak di tengah siklus)
+            val arc = sin((t.coerceIn(0f, 1f)) * Math.PI.toFloat())
+            bobPx = arc * cell * 1.7f
+            squashSigned = when {
+                t < 0.16f -> (0.16f - t) / 0.16f * 0.18f          // antisipasi: mendekam
+                t > 0.84f -> (t - 0.84f) / 0.16f * 0.22f          // mendarat: gepeng kuat
+                else -> -arc * 0.10f                              // di udara: memanjang
+            }
         } else {
+            // diam: napas lembut + sesekali bergoyang kenyal
             val b = (sin(phase * 0.5f) + 1f) * 0.5f
-            bobPx = b * cell * 0.45f
-            land = (1f - b) * 0.55f
+            bobPx = b * cell * 0.4f
+            squashSigned = (1f - b) * 0.06f + sin(phase * 1.4f) * 0.018f
         }
-        // getaran kenyal terus-menerus + tekanan saat mendarat
-        val jiggle = sin(phase * 3.0f) * 0.022f
-        val squash = land * 0.16f + jiggle
-        val sway = sin(phase * 1.25f) * (if (walking) 0.05f else 0.025f) // goyang kiri-kanan
+        val sx = 1f + squashSigned
+        val sy = 1f - squashSigned
+
+        // overlap/gooey: bagian atas condong terlambat (shear berosilasi + arah jalan)
+        val shear = sin(phase * 1.5f) * 0.045f + (if (walking) facing * 0.05f else 0f)
 
         val baseY = offY + cell * 15.5f // titik tumpu di kaki slime
 
-        // bayangan memantul: melebar & lebih pekat saat slime turun
-        val shadowHalf = cell * (4.5f + land * 2f)
-        shadow.alpha = (60 + land * 45).toInt().coerceIn(0, 255)
+        // bayangan memantul: melebar & pekat saat menyentuh tanah, mengecil saat melompat
+        val onGround = (1f - (bobPx / (cell * 1.7f))).coerceIn(0f, 1f)
+        val shadowHalf = cell * (4.2f + onGround * 2.3f)
+        shadow.alpha = (45 + onGround * 55).toInt().coerceIn(0, 255)
         canvas.drawOval(
             w / 2f - shadowHalf, baseY + cell * 0.2f,
-            w / 2f + shadowHalf, baseY + cell * 1.5f, shadow
+            w / 2f + shadowHalf, baseY + cell * 1.4f, shadow
         )
 
         canvas.save()
-        canvas.translate(sway * cell * 3f, -bobPx)
-        canvas.scale(1f + squash, 1f - squash, w / 2f, baseY) // gepeng = melebar, lonjak = tinggi
+        canvas.translate(0f, -bobPx)
+        // shear di sekitar kaki → atas bergoyang, dasar menempel (efek gooey)
+        canvas.translate(w / 2f, baseY)
+        canvas.skew(shear, 0f)
+        canvas.translate(-w / 2f, -baseY)
+        canvas.scale(sx, sy, w / 2f, baseY) // gepeng = melebar, lonjak = memanjang
         if (facing < 0) canvas.scale(-1f, 1f, w / 2f, h / 2f)
 
         for (r in base.indices) {

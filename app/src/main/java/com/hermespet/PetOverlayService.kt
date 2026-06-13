@@ -52,7 +52,7 @@ class PetOverlayService : Service() {
         @Volatile var instance: PetOverlayService? = null
         const val ACTION_APPLY_SCALE = "com.hermespet.APPLY_SCALE"
 
-        private const val BASE_SIZE_DP = 96
+        private const val BASE_SIZE_DP = 144 // View lebih besar; sprite isi ~66% + ruang gerak
         private const val TICK_MS = 60_000L
         private const val MOOD_MS = 60 * 60_000L // tiap jam
         private const val WALK_FRAME_MS = 16L // ~60 fps
