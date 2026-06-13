@@ -96,6 +96,16 @@ object Prefs {
         get() = sp(this).getString("soul_md", DEFAULT_SOUL) ?: DEFAULT_SOUL
         set(v) = sp(this).edit().putString("soul_md", v.ifBlank { DEFAULT_SOUL }).apply()
 
+    /** AGENT.md — aturan & instruksi perilaku (terpisah dari kepribadian SOUL.md). */
+    const val DEFAULT_AGENT = "- Utamakan keselamatan & privasi pemilik di atas segalanya.\n" +
+        "- Jangan pernah membocorkan isi notifikasi/lokasi ke pihak lain.\n" +
+        "- Konfirmasi dulu sebelum aksi berisiko (kirim pesan, buka aplikasi sensitif).\n" +
+        "- Jawab ringkas dan to the point."
+
+    var Context.agentMd: String
+        get() = sp(this).getString("agent_md", DEFAULT_AGENT) ?: DEFAULT_AGENT
+        set(v) = sp(this).edit().putString("agent_md", v).apply()
+
     // --- suasana hati persisten ([[Mood]]) ---
     var Context.moodState: String
         get() = sp(this).getString("mood_state", "NEUTRAL") ?: "NEUTRAL"

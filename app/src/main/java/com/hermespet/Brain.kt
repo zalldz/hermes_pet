@@ -10,6 +10,7 @@ import com.hermespet.Prefs.apiModel
 import com.hermespet.Prefs.brainMode
 import com.hermespet.Prefs.latitude
 import com.hermespet.Prefs.longitude
+import com.hermespet.Prefs.agentMd
 import com.hermespet.Prefs.soulMd
 import com.hermespet.Prefs.visionModel
 import okhttp3.Call
@@ -50,9 +51,11 @@ object Brain {
     private var lastLowBatt = 0L
     private var lastEventReminded = ""
 
-    /** SOUL.md pengguna + aturan format yang tidak boleh dilanggar (untuk parsing). */
+    /** SOUL.md (kepribadian) + AGENT.md (aturan/instruksi) + aturan format JSON. */
     private fun systemPrompt(ctx: Context): String =
-        ctx.soulMd + "\n\nFORMAT WAJIB: balas HANYA dengan JSON satu baris: " +
+        ctx.soulMd +
+            (if (ctx.agentMd.isNotBlank()) "\n\n# Aturan & Instruksi (AGENT.md)\n" + ctx.agentMd else "") +
+            "\n\nFORMAT WAJIB: balas HANYA dengan JSON satu baris: " +
             "{\"say\": \"<ucapanmu, bahasa Indonesia santai>\", " +
             "\"emotion\": \"<happy|sad|neutral|sleepy|surprised|love|angry>\"}\n" +
             "Warna tubuhmu otomatis mengikuti emosi (hijau senang, biru sedih, " +
@@ -70,6 +73,7 @@ object Brain {
             "{\"type\":\"web_search\",\"query\":\"<kata kunci>\"} (buka hasil pencarian di browser) | " +
             "{\"type\":\"whatsapp\",\"number\":\"<nomor, kosongkan jika tak tahu>\",\"text\":\"<pesan>\"} " +
             "(buka WhatsApp dengan pesan siap kirim) | " +
+            "{\"type\":\"location\"} (cek & laporkan lokasi/GPS pemilik sekarang) | " +
             "{\"type\":\"wifi_panel\"} | {\"type\":\"bluetooth_panel\"} | " +
             "{\"type\":\"dnd\",\"on\":true/false} (mode Jangan Ganggu) | " +
             "{\"type\":\"set_alarm\",\"hour\":0-23,\"minute\":0-59,\"label\":\"<judul>\"} | " +

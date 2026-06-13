@@ -16,6 +16,7 @@
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
     <!-- tanpa deklarasi ini, toggle "Ubah setelan sistem" terkunci -->
     <uses-permission android:name="android.permission.WRITE_SETTINGS"
         tools:ignore="ProtectedPermissions" />
@@ -98,7 +99,7 @@
         <service
             android:name=".PetOverlayService"
             android:exported="false"
-            android:foregroundServiceType="dataSync|camera|microphone" />
+            android:foregroundServiceType="dataSync|camera|microphone|location" />
 
         <service
             android:name=".NotifListener"

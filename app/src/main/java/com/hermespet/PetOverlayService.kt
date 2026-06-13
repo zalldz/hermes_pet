@@ -34,6 +34,8 @@ import android.widget.Button
 import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.TextView
+import com.hermespet.Prefs.latitude
+import com.hermespet.Prefs.longitude
 import com.hermespet.Prefs.moodCheckEnabled
 import com.hermespet.Prefs.musicDance
 import com.hermespet.Prefs.petScale
@@ -712,13 +714,75 @@ class PetOverlayService : Service() {
             say(text, null, typewriter = true)
             speak(text)
         }
+        // KEAMANAN: aksi nyata HANYA dijalankan dari perintah langsung pemilik
+        // (chat/suara/lihat-layar). Notifikasi/tick/sapaan TIDAK boleh memicu aksi —
+        // mencegah prompt-injection dari konten luar ("boomerang").
+        val actionAllowed = type == "chat" || type == "vision"
         reply.optJSONObject("action")?.let { act ->
+            if (!actionAllowed) {
+                PetLog.add(this, "aksi", "DIBLOKIR (aksi dari event '$type' tidak diizinkan)")
+                return@let
+            }
+            if (act.optString("type") == "location") { fetchLocation(); return@let }
             val feedback = Actions.run(this, act)
             if (!feedback.isNullOrEmpty()) {
                 PetLog.add(this, "aksi", feedback)
                 if (text.isEmpty()) { say(feedback, null, typewriter = true); speak(feedback) }
             }
         }
+    }
+
+    /** Cek lokasi aktif (GPS/fused) lalu laporkan + perbarui lat/lon untuk cuaca. */
+    private fun fetchLocation() {
+        val fine = checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) ==
+            PackageManager.PERMISSION_GRANTED
+        val coarse = checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) ==
+            PackageManager.PERMISSION_GRANTED
+        if (!fine && !coarse) {
+            say("Beri aku izin lokasi dulu ya (di pengaturan) 📍🥺", PetView.Emotion.SAD)
+            return
+        }
+        say("Sebentar, cek lokasi... 📍", PetView.Emotion.SURPRISED)
+        val lm = getSystemService(Context.LOCATION_SERVICE) as android.location.LocationManager
+        val provider = when {
+            Build.VERSION.SDK_INT >= 31 &&
+                lm.isProviderEnabled(android.location.LocationManager.FUSED_PROVIDER) ->
+                android.location.LocationManager.FUSED_PROVIDER
+            lm.isProviderEnabled(android.location.LocationManager.GPS_PROVIDER) ->
+                android.location.LocationManager.GPS_PROVIDER
+            lm.isProviderEnabled(android.location.LocationManager.NETWORK_PROVIDER) ->
+                android.location.LocationManager.NETWORK_PROVIDER
+            else -> { say("GPS-nya mati, nyalakan dulu ya 🛰️", PetView.Emotion.SAD); return }
+        }
+        try {
+            if (Build.VERSION.SDK_INT >= 30) {
+                lm.getCurrentLocation(provider, null, mainExecutor) { loc ->
+                    if (loc != null) reportLocation(loc)
+                    else lm.getLastKnownLocation(provider)?.let { reportLocation(it) }
+                        ?: say("Belum dapat sinyal GPS, coba di tempat terbuka 🛰️", PetView.Emotion.SAD)
+                }
+            } else {
+                @Suppress("DEPRECATION")
+                lm.getLastKnownLocation(provider)?.let { reportLocation(it) }
+                    ?: say("Belum dapat sinyal GPS 🛰️", PetView.Emotion.SAD)
+            }
+        } catch (e: SecurityException) {
+            say("Izin lokasiku diblokir 😖", PetView.Emotion.SAD)
+        }
+    }
+
+    private fun reportLocation(loc: android.location.Location) {
+        latitude = String.format(java.util.Locale.US, "%.4f", loc.latitude)
+        longitude = String.format(java.util.Locale.US, "%.4f", loc.longitude)
+        val place = try {
+            android.location.Geocoder(this, java.util.Locale("id"))
+                .getFromLocation(loc.latitude, loc.longitude, 1)
+                ?.firstOrNull()?.let { it.subLocality ?: it.locality ?: it.adminArea }
+        } catch (e: Exception) { null }
+        val where = if (place != null) "di sekitar $place" else "di ${latitude}, ${longitude}"
+        val msg = "Kamu lagi $where 📍 (akurasi ±${loc.accuracy.toInt()}m)"
+        say(msg, PetView.Emotion.HAPPY, typewriter = true); speak(msg)
+        PetLog.add(this, "aksi", "cek lokasi: $where")
     }
 
     private var typeFull = ""
@@ -815,6 +879,11 @@ class PetOverlayService : Service() {
             if (hasCameraPermission()) type = type or ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA
             if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
                 type = type or ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE
+            }
+            // tipe location hanya ditambah bila izin sudah ada → bisa baca GPS dari FGS
+            if (checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
+                checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
+                type = type or ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION
             }
             startForeground(1, notif, type)
         } else {

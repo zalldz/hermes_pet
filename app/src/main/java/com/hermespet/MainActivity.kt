@@ -18,6 +18,7 @@ import android.widget.ScrollView
 import android.widget.SeekBar
 import android.widget.Switch
 import android.widget.TextView
+import com.hermespet.Prefs.agentMd
 import com.hermespet.Prefs.agentUrl
 import com.hermespet.Prefs.apiBaseUrl
 import com.hermespet.Prefs.apiKey
@@ -167,6 +168,20 @@ class MainActivity : Activity() {
             soulInput.setText(Prefs.DEFAULT_SOUL)
         })
 
+        col.addView(TextView(this).apply {
+            text = "AGENT.md — aturan & instruksi perilaku pet:"
+        })
+        val agentInput = EditText(this).apply {
+            setText(agentMd)
+            minLines = 4
+            gravity = android.view.Gravity.TOP
+            textSize = 13f
+        }
+        col.addView(agentInput)
+        col.addView(button("Kembalikan AGENT.md bawaan") {
+            agentInput.setText(Prefs.DEFAULT_AGENT)
+        })
+
         col.addView(button("Simpan pengaturan otak") {
             apiKey = keyInput.text.toString().trim()
             apiModel = modelInput.text.toString().trim()
@@ -177,6 +192,7 @@ class MainActivity : Activity() {
             longitude = lonInput.text.toString().trim()
             agentUrl = urlInput.text.toString().trim()
             soulMd = soulInput.text.toString()
+            agentMd = agentInput.text.toString()
             toastStatus("Pengaturan otak disimpan")
         })
 
