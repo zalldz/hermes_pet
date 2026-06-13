@@ -265,6 +265,7 @@ class PetOverlayService : Service() {
             setTextColor(Color.parseColor("#3E2723"))
             setHintTextColor(Color.parseColor("#9E9E9E"))
         }
+        val eye = Button(this).apply { text = "👁" } // lihat layar
         val send = Button(this).apply { text = "➤" }
         val row = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
@@ -275,8 +276,9 @@ class PetOverlayService : Service() {
             }
             val p = dp(6f).toInt()
             setPadding(p, p, p, p)
-            addView(input, LinearLayout.LayoutParams(dp(200f).toInt(),
+            addView(input, LinearLayout.LayoutParams(dp(170f).toInt(),
                 LinearLayout.LayoutParams.WRAP_CONTENT))
+            addView(eye)
             addView(send)
         }
         val clp = WindowManager.LayoutParams(
@@ -303,6 +305,12 @@ class PetOverlayService : Service() {
         }
         send.setOnClickListener { submit() }
         input.setOnEditorActionListener { _, _, _ -> submit(); true }
+        eye.setOnClickListener {
+            val q = input.text.toString().trim()
+                .ifBlank { "Apa yang kamu lihat di layar ini? Jelaskan singkat." }
+            closeChat()
+            lookAtScreen(q)
+        }
 
         wm.addView(row, clp)
         chatView = row
@@ -470,6 +478,34 @@ class PetOverlayService : Service() {
         sendToBrain("notification", data)
     }
 
+    // ---------------------------------------------------------------- lihat layar
+
+    /** Mulai alur tangkap layar (minta izin MediaProjection lalu pahami via vision). */
+    private fun lookAtScreen(question: String) {
+        PetLog.add(this, "user", "👁 $question")
+        say("👁 Lihat layar dulu...", PetView.Emotion.SURPRISED)
+        startActivity(Intent(this, CaptureActivity::class.java)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            .putExtra("question", question))
+    }
+
+    /** Sembunyikan pet+gelembung sesaat agar tidak ikut tertangkap screenshot. */
+    fun setOverlayHidden(hidden: Boolean) = handler.post {
+        val v = if (hidden) View.INVISIBLE else View.VISIBLE
+        root.visibility = v
+        if (bubbleShown) bubble.visibility = v
+    }
+
+    /** Hasil tangkap layar dari ScreenCaptureService. */
+    fun onScreenCaptured(imageB64: String?, question: String) = handler.post {
+        if (imageB64 == null) {
+            say("Yah, gagal lihat layarnya 😖", PetView.Emotion.SAD)
+            return@handler
+        }
+        say("🤔 Mengamati...", null)
+        Brain.askVision(this, question, imageB64) { reply -> applyReply("vision", reply) }
+    }
+
     /** Dipanggil ReminderReceiver saat pengingat tiba & pet sedang hidup. */
     fun announceReminder(text: String) {
         handler.post {
@@ -482,32 +518,30 @@ class PetOverlayService : Service() {
     private fun sendToBrain(type: String, data: JSONObject) {
         // interaksi langsung memperbarui "kapan terakhir disapa" (anti-kesepian)
         if (type == "chat" || type == "poke") Mood.noteInteraction(this)
-        Brain.sendEvent(this, type, data) { reply ->
-            reply ?: return@sendEvent
-            val emotion = reply.optString("emotion", "")
-            if (emotion.isNotEmpty()) {
-                val emo = PetView.emotionFrom(emotion)
-                pet.emotion = emo
-                transientUntil = System.currentTimeMillis() + 12_000
-                // chat & cek-mood kamera membentuk suasana hati yang menetap
-                if (type == "chat" || type == "mood") Mood.note(this, emo)
-            }
-            val text = reply.optString("say", "")
-            if (text.isNotEmpty()) {
-                PetLog.add(this, "pet", text)
-                say(text, null)
-                speak(text)
-            }
-            // otak minta aksi nyata (volume, senter, buka app, dll.)
-            reply.optJSONObject("action")?.let { act ->
-                val feedback = Actions.run(this, act)
-                if (!feedback.isNullOrEmpty()) {
-                    PetLog.add(this, "aksi", feedback)
-                    if (text.isEmpty()) {
-                        say(feedback, null)
-                        speak(feedback)
-                    }
-                }
+        Brain.sendEvent(this, type, data) { reply -> applyReply(type, reply) }
+    }
+
+    /** Terapkan balasan otak: emosi+mood, ucapan, dan aksi nyata. Dipakai chat & vision. */
+    private fun applyReply(type: String, reply: JSONObject?) {
+        reply ?: return
+        val emotion = reply.optString("emotion", "")
+        if (emotion.isNotEmpty()) {
+            val emo = PetView.emotionFrom(emotion)
+            pet.emotion = emo
+            transientUntil = System.currentTimeMillis() + 12_000
+            if (type == "chat" || type == "mood" || type == "vision") Mood.note(this, emo)
+        }
+        val text = reply.optString("say", "")
+        if (text.isNotEmpty()) {
+            PetLog.add(this, "pet", text)
+            say(text, null)
+            speak(text)
+        }
+        reply.optJSONObject("action")?.let { act ->
+            val feedback = Actions.run(this, act)
+            if (!feedback.isNullOrEmpty()) {
+                PetLog.add(this, "aksi", feedback)
+                if (text.isEmpty()) { say(feedback, null); speak(feedback) }
             }
         }
     }

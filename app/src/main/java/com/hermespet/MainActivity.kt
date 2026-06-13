@@ -24,6 +24,7 @@ import com.hermespet.Prefs.apiKey
 import com.hermespet.Prefs.apiModel
 import com.hermespet.Prefs.brainMode
 import com.hermespet.Prefs.embModel
+import com.hermespet.Prefs.visionModel
 import com.hermespet.Prefs.latitude
 import com.hermespet.Prefs.longitude
 import com.hermespet.Prefs.moodCheckEnabled
@@ -126,6 +127,15 @@ class MainActivity : Activity() {
         }
         col.addView(embInput)
 
+        col.addView(TextView(this).apply {
+            text = "Model vision — untuk 'lihat layar' (wajib multimodal):"
+        })
+        val visionInput = EditText(this).apply {
+            setText(visionModel)
+            hint = "mis. google/gemini-flash-1.5 (kosong = model utama)"
+        }
+        col.addView(visionInput)
+
         col.addView(TextView(this).apply { text = "Lokasi untuk cuaca (lat, lon):" })
         val latInput = EditText(this).apply { setText(latitude); hint = "-6.2" }
         val lonInput = EditText(this).apply { setText(longitude); hint = "106.8" }
@@ -161,6 +171,7 @@ class MainActivity : Activity() {
             apiModel = modelInput.text.toString().trim()
             apiBaseUrl = baseInput.text.toString().trim()
             embModel = embInput.text.toString().trim()
+            visionModel = visionInput.text.toString().trim()
             latitude = latInput.text.toString().trim()
             longitude = lonInput.text.toString().trim()
             agentUrl = urlInput.text.toString().trim()

@@ -11,6 +11,7 @@ import com.hermespet.Prefs.brainMode
 import com.hermespet.Prefs.latitude
 import com.hermespet.Prefs.longitude
 import com.hermespet.Prefs.soulMd
+import com.hermespet.Prefs.visionModel
 import okhttp3.Call
 import okhttp3.Callback
 import okhttp3.MediaType.Companion.toMediaType
@@ -187,6 +188,52 @@ object Brain {
 
     /** Memori percakapan: 6 tukar-kata terakhir disertakan sebagai konteks. */
     private val chatHistory = ArrayDeque<Pair<String, String>>()
+
+    /**
+     * Tanya model VISION soal screenshot. Butuh model multimodal (set di
+     * pengaturan "Model vision"). imageB64 = JPEG base64 tanpa prefix.
+     */
+    fun askVision(ctx: Context, question: String, imageB64: String, onReply: (JSONObject?) -> Unit) {
+        val key = ctx.apiKey
+        val model = ctx.visionModel.ifBlank { ctx.apiModel }
+        if (key.isBlank()) {
+            onReply(reply("Isi API key & model vision dulu ya biar aku bisa lihat 🥺", "sad"))
+            return
+        }
+        val content = JSONArray()
+            .put(JSONObject().put("type", "text").put("text", question))
+            .put(JSONObject().put("type", "image_url").put("image_url",
+                JSONObject().put("url", "data:image/jpeg;base64,$imageB64")))
+        val body = JSONObject()
+            .put("model", model)
+            .put("max_tokens", 500)
+            .put("messages", JSONArray()
+                .put(JSONObject().put("role", "system").put("content", systemPrompt(ctx)))
+                .put(JSONObject().put("role", "user").put("content", content)))
+        val req = Request.Builder()
+            .url(ctx.apiBaseUrl.trimEnd('/') + "/chat/completions")
+            .header("Authorization", "Bearer $key")
+            .post(body.toString().toRequestBody(jsonType))
+            .build()
+        http.newCall(req).enqueue(object : Callback {
+            override fun onFailure(call: Call, e: IOException) {
+                main.post { onReply(reply("Gagal melihat layar: ${e.message} 😖", "sad")) }
+            }
+            override fun onResponse(call: Call, response: Response) {
+                val parsed = try {
+                    response.use { r ->
+                        val c = JSONObject(r.body?.string() ?: "{}")
+                            .optJSONArray("choices")?.optJSONObject(0)
+                            ?.optJSONObject("message")?.optString("content") ?: ""
+                        extractJson(c) ?: reply(c.take(400).ifBlank { "Hmm, aku tak yakin 🤔" }, "neutral")
+                    }
+                } catch (e: Exception) {
+                    reply("Model vision-nya menolak gambar ini 😖 (pastikan modelnya multimodal)", "sad")
+                }
+                main.post { onReply(parsed) }
+            }
+        })
+    }
 
     private fun handleChat(ctx: Context, data: JSONObject, onReply: (JSONObject?) -> Unit) {
         val text = data.optString("text").take(500)

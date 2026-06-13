@@ -34,6 +34,11 @@ object Prefs {
         get() = sp(this).getString("emb_model", "") ?: ""
         set(v) = sp(this).edit().putString("emb_model", v).apply()
 
+    /** Model multimodal untuk "melihat layar" (kosong = pakai model utama). */
+    var Context.visionModel: String
+        get() = sp(this).getString("vision_model", "") ?: ""
+        set(v) = sp(this).edit().putString("vision_model", v).apply()
+
     var Context.latitude: String
         get() = sp(this).getString("lat", "-6.2") ?: "-6.2"
         set(v) = sp(this).edit().putString("lat", v).apply()
