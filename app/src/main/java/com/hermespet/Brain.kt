@@ -48,8 +48,8 @@ object Brain {
     private var lastLowBatt = 0L
     private var lastEventReminded = ""
 
-    /** SOUL.md (kepribadian) + AGENT.md (aturan/instruksi) + aturan format JSON. */
-    private fun systemPrompt(ctx: Context): String =
+    /** Bagian dasar prompt TANPA daftar aksi — dipakai event latar agar hemat token & cepat. */
+    private fun systemPromptBase(ctx: Context): String =
         "Tanggal & waktu SEKARANG (sumber kebenaran, abaikan pengetahuan modelmu " +
             "soal tanggal): " +
             java.text.SimpleDateFormat("EEEE, d MMMM yyyy, HH:mm", java.util.Locale("id"))
@@ -65,7 +65,12 @@ object Brain {
             "MEMORI: kalau dari obrolan kamu belajar FAKTA penting & tahan lama tentang " +
             "pemilik (nama, preferensi, rencana, orang/tempat penting), tambahkan field " +
             "\"remember\":{\"text\":\"<fakta singkat>\",\"importance\":0.1-1.0} di JSON. " +
-            "Jangan mengingat hal sepele atau sementara.\n" +
+            "Jangan mengingat hal sepele atau sementara.\n"
+
+    /** Prompt lengkap + daftar aksi — HANYA untuk chat/perintah/vision. */
+    private fun systemPrompt(ctx: Context, withActions: Boolean): String =
+        if (!withActions) systemPromptBase(ctx)
+        else systemPromptBase(ctx) +
             "Kamu juga bisa MELAKUKAN aksi di HP. Kalau (dan hanya kalau) pemilik " +
             "memintanya, tambahkan field \"action\" di JSON. Untuk tugas GABUNGAN " +
             "(mis. \"siapkan aku tidur\"), beri BEBERAPA aksi berurutan lewat " +
@@ -221,7 +226,7 @@ object Brain {
             .put("model", model)
             .put("max_tokens", 500)
             .put("messages", JSONArray()
-                .put(JSONObject().put("role", "system").put("content", systemPrompt(ctx)))
+                .put(JSONObject().put("role", "system").put("content", systemPrompt(ctx, true)))
                 .put(JSONObject().put("role", "user").put("content", content)))
         val req = Request.Builder()
             .url(ctx.apiBaseUrl.trimEnd('/') + "/chat/completions")
@@ -273,7 +278,7 @@ object Brain {
             }
             if (onStream != null && ctx.apiKey.isNotBlank())
                 askHermesStream(ctx, prompt, fb, "love", onStream, onDone)
-            else askHermes(ctx, prompt, fb, "love", surfaceErrors = true, onReply = onDone)
+            else askHermes(ctx, prompt, fb, "love", withActions = true, surfaceErrors = true, onReply = onDone)
         }
     }
 
@@ -346,7 +351,9 @@ object Brain {
     private fun askHermes(
         ctx: Context, context: String,
         fallbackSay: String, fallbackEmotion: String,
+        withActions: Boolean = false,
         surfaceErrors: Boolean = false,
+        retry: Int = 1,
         onReply: (JSONObject?) -> Unit
     ) {
         // saat error: chat menampilkan pesan jelas; event ambient diam (null)
@@ -363,7 +370,7 @@ object Brain {
             .put("max_tokens", 700)
             .put("temperature", 0.8)
             .put("messages", JSONArray()
-                .put(JSONObject().put("role", "system").put("content", systemPrompt(ctx)))
+                .put(JSONObject().put("role", "system").put("content", systemPrompt(ctx, withActions)))
                 .put(JSONObject().put("role", "user").put("content", context)))
         val req = Request.Builder()
             .url(ctx.apiBaseUrl.trimEnd('/') + "/chat/completions")
@@ -374,7 +381,11 @@ object Brain {
         http.newCall(req).enqueue(object : Callback {
             override fun onFailure(call: Call, e: IOException) {
                 Log.w(TAG, "api gagal: ${e.message}")
-                main.post { onReply(onErr(-1)) }
+                if (retry > 0) main.postDelayed({ // auto-retry sekali saat koneksi tersendat
+                    askHermes(ctx, context, fallbackSay, fallbackEmotion, withActions,
+                        surfaceErrors, retry - 1, onReply)
+                }, 900)
+                else main.post { onReply(onErr(-1)) }
             }
 
             override fun onResponse(call: Call, response: Response) {
@@ -400,7 +411,8 @@ object Brain {
     private fun askHermesStream(
         ctx: Context, context: String,
         fallbackSay: String, fallbackEmotion: String,
-        onStream: (String) -> Unit, onReply: (JSONObject?) -> Unit
+        onStream: (String) -> Unit, onReply: (JSONObject?) -> Unit,
+        retry: Int = 1
     ) {
         val body = JSONObject()
             .put("model", ctx.apiModel)
@@ -408,7 +420,7 @@ object Brain {
             .put("temperature", 0.8)
             .put("stream", true)
             .put("messages", JSONArray()
-                .put(JSONObject().put("role", "system").put("content", systemPrompt(ctx)))
+                .put(JSONObject().put("role", "system").put("content", systemPrompt(ctx, true)))
                 .put(JSONObject().put("role", "user").put("content", context)))
         val req = Request.Builder()
             .url(ctx.apiBaseUrl.trimEnd('/') + "/chat/completions")
@@ -418,7 +430,10 @@ object Brain {
 
         http.newCall(req).enqueue(object : Callback {
             override fun onFailure(call: Call, e: IOException) {
-                main.post { onReply(reply(errMsg(-1), "sad")) }
+                if (retry > 0) main.postDelayed({
+                    askHermesStream(ctx, context, fallbackSay, fallbackEmotion, onStream, onReply, retry - 1)
+                }, 900)
+                else main.post { onReply(reply(errMsg(-1), "sad")) }
             }
 
             override fun onResponse(call: Call, response: Response) {

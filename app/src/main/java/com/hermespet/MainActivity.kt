@@ -77,8 +77,8 @@ class MainActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        // pertama kali buka → tampilkan wizard setup ramah pemula
-        if (!setupDone) startActivity(Intent(this, WizardActivity::class.java))
+        // pertama kali buka → tampilkan wizard setup ramah pemula (sekali saja)
+        if (!setupDone) { setupDone = true; startActivity(Intent(this, WizardActivity::class.java)) }
         val pad = (16 * resources.displayMetrics.density).toInt()
 
         val col = LinearLayout(this).apply {
@@ -113,75 +113,53 @@ class MainActivity : Activity() {
             }
         })
 
-        // --- pengaturan lanjutan (disembunyikan dari pemula) ---
-        val adv = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; visibility = View.GONE }
-        col.addView(button("⚙️ Pengaturan lanjutan (model, base URL, SOUL/AGENT…)") {
-            adv.visibility = if (adv.visibility == View.GONE) View.VISIBLE else View.GONE
-        })
-        col.addView(adv)
+        col.addView(hint("Tempel API key (mis. dari OpenRouter). Tanpa key, pet hidup tapi jawabannya bawaan saja."))
 
-        adv.addView(TextView(this).apply { text = "Model:" })
+        col.addView(TextView(this).apply { text = "Model:" })
         val modelInput = EditText(this).apply { setText(apiModel) }
-        adv.addView(modelInput)
+        col.addView(modelInput)
+        col.addView(hint("Nama model AI. Cepat & murah: google/gemini-flash-1.5"))
 
-        adv.addView(TextView(this).apply { text = "Base URL API:" })
+        col.addView(TextView(this).apply { text = "Base URL API:" })
         val baseInput = EditText(this).apply { setText(apiBaseUrl) }
-        adv.addView(baseInput)
+        col.addView(baseInput)
+        col.addView(hint("Alamat server AI. OpenRouter: https://openrouter.ai/api/v1"))
 
-        adv.addView(TextView(this).apply {
-            text = "Model embeddings — memori vektor (opsional, kosong = kata kunci):"
-        })
-        val embInput = EditText(this).apply {
-            setText(embModel)
-            hint = "mis. text-embedding-3-small"
-        }
-        adv.addView(embInput)
+        col.addView(TextView(this).apply { text = "Model embeddings (opsional):" })
+        val embInput = EditText(this).apply { setText(embModel); hint = "mis. text-embedding-3-small" }
+        col.addView(embInput)
+        col.addView(hint("Bikin memori lebih akurat. Kosong = pakai pencarian kata kunci (tetap jalan)."))
 
-        adv.addView(TextView(this).apply {
-            text = "Model vision — untuk 'lihat layar' (wajib multimodal):"
-        })
-        val visionInput = EditText(this).apply {
-            setText(visionModel)
-            hint = "mis. google/gemini-flash-1.5 (kosong = model utama)"
-        }
-        adv.addView(visionInput)
+        col.addView(TextView(this).apply { text = "Model vision (opsional):" })
+        val visionInput = EditText(this).apply { setText(visionModel); hint = "mis. google/gemini-flash-1.5" }
+        col.addView(visionInput)
+        col.addView(hint("Untuk fitur 'lihat layar/gambar'. Wajib model multimodal. Kosong = pakai model utama."))
 
-        adv.addView(TextView(this).apply { text = "Lokasi untuk cuaca (lat, lon):" })
+        col.addView(TextView(this).apply { text = "Lokasi untuk cuaca (lat, lon):" })
         val latInput = EditText(this).apply { setText(latitude); hint = "-6.2" }
         val lonInput = EditText(this).apply { setText(longitude); hint = "106.8" }
-        adv.addView(LinearLayout(this).apply {
+        col.addView(LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             addView(latInput, LinearLayout.LayoutParams(0, -2, 1f))
             addView(lonInput, LinearLayout.LayoutParams(0, -2, 1f))
         })
+        col.addView(hint("Terisi otomatis kalau izin lokasi aktif; boleh juga diisi manual."))
 
-        adv.addView(TextView(this).apply {
-            text = "SOUL.md — kepribadian pet (silakan edit sesukamu):"
-        })
+        col.addView(TextView(this).apply { text = "SOUL.md — kepribadian pet:" })
         val soulInput = EditText(this).apply {
-            setText(soulMd)
-            minLines = 5
-            gravity = android.view.Gravity.TOP
-            textSize = 13f
+            setText(soulMd); minLines = 5; gravity = android.view.Gravity.TOP; textSize = 13f
         }
-        adv.addView(soulInput)
-        adv.addView(button("Kembalikan SOUL.md bawaan") {
-            soulInput.setText(Prefs.DEFAULT_SOUL)
-        })
+        col.addView(soulInput)
+        col.addView(hint("Siapa pet-mu: sifat & gaya bicara. Mengubah karakternya."))
+        col.addView(button("Kembalikan SOUL.md bawaan") { soulInput.setText(Prefs.DEFAULT_SOUL) })
 
-        adv.addView(TextView(this).apply {
-            text = "AGENT.md — aturan & instruksi perilaku pet:"
-        })
+        col.addView(TextView(this).apply { text = "AGENT.md — aturan & instruksi:" })
         val agentInput = EditText(this).apply {
-            setText(agentMd)
-            minLines = 4
-            gravity = android.view.Gravity.TOP
-            textSize = 13f
+            setText(agentMd); minLines = 4; gravity = android.view.Gravity.TOP; textSize = 13f
         }
-        adv.addView(agentInput)
-        adv.addView(button("Kembalikan AGENT.md bawaan") {
-            agentInput.setText(Prefs.DEFAULT_AGENT)
-        })
+        col.addView(agentInput)
+        col.addView(hint("Aturan perilaku pet: cara kerja, privasi, kejujuran."))
+        col.addView(button("Kembalikan AGENT.md bawaan") { agentInput.setText(Prefs.DEFAULT_AGENT) })
 
         col.addView(button("Simpan pengaturan otak") {
             apiKey = keyInput.text.toString().trim()
@@ -322,6 +300,10 @@ class MainActivity : Activity() {
     private fun toastStatus(msg: String) {
         android.widget.Toast.makeText(this, msg, android.widget.Toast.LENGTH_SHORT).show()
         refreshStatus()
+    }
+
+    private fun hint(t: String): TextView = TextView(this).apply {
+        text = t; textSize = 11f; setTextColor(0xFF888888.toInt()); setPadding(0, 0, 0, 10)
     }
 
     private fun section(title: String): TextView = TextView(this).apply {

@@ -543,7 +543,10 @@ class PetOverlayService : Service() {
                 hopStart = 0L
                 pet.hopT = -1f
             }
-            handler.postDelayed(this, WALK_FRAME_MS)
+            // hemat baterai: saat pet istirahat (idle), perlambat loop; saat
+            // bergerak/melompat, tetap 60fps untuk gerak mulus
+            val idle = now < pausedUntil
+            handler.postDelayed(this, if (idle) 220L else WALK_FRAME_MS)
         }
     }
 

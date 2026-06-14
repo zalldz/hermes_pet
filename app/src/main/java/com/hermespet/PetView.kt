@@ -139,7 +139,10 @@ class PetView(context: Context) : View(context) {
                 nextBlinkAt = now + if (blink) 130 else (1500 + Random.nextLong(3500))
             }
             invalidate()
-            if (awake) postDelayed(this, 16) // ~60fps; dimatikan saat layar off
+            // hemat baterai: 60fps hanya saat sibuk (lompat/partikel/musik/benturan),
+            // saat diam turun ke ~20fps (napas/kedip tetap halus)
+            val busy = hopT in 0f..1f || particles.isNotEmpty() || beat > 0.01f || impact > 0.01f
+            if (awake) postDelayed(this, if (busy) 16L else 50L)
         }
     }
 
