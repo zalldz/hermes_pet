@@ -862,16 +862,19 @@ class PetOverlayService : Service() {
         val channelId = "hermespet"
         val nm = getSystemService(NotificationManager::class.java)
         nm.createNotificationChannel(
-            NotificationChannel(channelId, "HermesPet", NotificationManager.IMPORTANCE_LOW)
+            // IMPORTANCE_MIN: tidak muncul di status bar, ringkas & senyap
+            NotificationChannel(channelId, "Status pet", NotificationManager.IMPORTANCE_MIN).apply {
+                setShowBadge(false)
+            }
         )
         val pi = PendingIntent.getActivity(
             this, 0, Intent(this, MainActivity::class.java), PendingIntent.FLAG_IMMUTABLE
         )
         val notif = Notification.Builder(this, channelId)
-            .setContentTitle("HermesPet aktif")
-            .setContentText("Pet sedang jalan-jalan di layarmu")
-            .setSmallIcon(android.R.drawable.star_on)
+            .setContentTitle("🐾 HermesPet")
+            .setSmallIcon(R.mipmap.ic_launcher)
             .setContentIntent(pi)
+            .setOngoing(true)
             .build()
 
         if (Build.VERSION.SDK_INT >= 30) {

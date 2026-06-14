@@ -19,11 +19,9 @@ import android.widget.SeekBar
 import android.widget.Switch
 import android.widget.TextView
 import com.hermespet.Prefs.agentMd
-import com.hermespet.Prefs.agentUrl
 import com.hermespet.Prefs.apiBaseUrl
 import com.hermespet.Prefs.apiKey
 import com.hermespet.Prefs.apiModel
-import com.hermespet.Prefs.brainMode
 import com.hermespet.Prefs.embModel
 import com.hermespet.Prefs.visionModel
 import com.hermespet.Prefs.latitude
@@ -97,16 +95,8 @@ class MainActivity : Activity() {
         col.addView(permPanel)
 
         // --- koneksi otak ---
-        col.addView(section("2. Otak (model Hermes)"))
-        @Suppress("UseSwitchCompatOrMaterialCode")
-        val apiModeSwitch = Switch(this).apply {
-            text = "Otak bawaan via API — standalone, tanpa Termux"
-            isChecked = brainMode == "api"
-            setOnCheckedChangeListener { _, on -> brainMode = if (on) "api" else "termux" }
-        }
-        col.addView(apiModeSwitch)
-
-        col.addView(TextView(this).apply { text = "API key (Nous Portal / OpenRouter):" })
+        col.addView(section("2. Otak (AI)"))
+        col.addView(TextView(this).apply { text = "API key (OpenRouter / server lokal):" })
         val keyInput = EditText(this).apply {
             setText(apiKey); hint = "sk-... (kosong = balasan bawaan)"
         }
@@ -147,13 +137,6 @@ class MainActivity : Activity() {
             addView(lonInput, LinearLayout.LayoutParams(0, -2, 1f))
         })
 
-        col.addView(TextView(this).apply { text = "Alamat server Termux (hanya mode Termux):" })
-        val urlInput = EditText(this).apply {
-            setText(agentUrl)
-            hint = "http://127.0.0.1:8765"
-        }
-        col.addView(urlInput)
-
         col.addView(TextView(this).apply {
             text = "SOUL.md — kepribadian pet (silakan edit sesukamu):"
         })
@@ -190,7 +173,6 @@ class MainActivity : Activity() {
             visionModel = visionInput.text.toString().trim()
             latitude = latInput.text.toString().trim()
             longitude = lonInput.text.toString().trim()
-            agentUrl = urlInput.text.toString().trim()
             soulMd = soulInput.text.toString()
             agentMd = agentInput.text.toString()
             toastStatus("Pengaturan otak disimpan")

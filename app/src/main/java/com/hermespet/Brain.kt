@@ -7,7 +7,6 @@ import android.util.Log
 import com.hermespet.Prefs.apiBaseUrl
 import com.hermespet.Prefs.apiKey
 import com.hermespet.Prefs.apiModel
-import com.hermespet.Prefs.brainMode
 import com.hermespet.Prefs.latitude
 import com.hermespet.Prefs.longitude
 import com.hermespet.Prefs.agentMd
@@ -27,10 +26,8 @@ import java.util.concurrent.TimeUnit
 import kotlin.random.Random
 
 /**
- * Otak pet. Dua mode:
- *  - "api"    : standalone — APK langsung memanggil model Hermes lewat endpoint
- *               OpenAI-compatible (Nous Portal, OpenRouter, dll). Tanpa Termux.
- *  - "termux" : meneruskan event ke server hermes-agent di Termux (HermesClient).
+ * Otak pet, standalone: APK langsung memanggil model lewat endpoint
+ * OpenAI-compatible (OpenRouter, server lokal di HP, dll).
  * Tanpa API key pun pet tetap hidup dengan balasan bawaan.
  */
 object Brain {
@@ -53,6 +50,10 @@ object Brain {
 
     /** SOUL.md (kepribadian) + AGENT.md (aturan/instruksi) + aturan format JSON. */
     private fun systemPrompt(ctx: Context): String =
+        "Tanggal & waktu SEKARANG (sumber kebenaran, abaikan pengetahuan modelmu " +
+            "soal tanggal): " +
+            java.text.SimpleDateFormat("EEEE, d MMMM yyyy, HH:mm", java.util.Locale("id"))
+                .format(java.util.Date()) + ".\n\n" +
         ctx.soulMd +
             (if (ctx.agentMd.isNotBlank()) "\n\n# Aturan & Instruksi (AGENT.md)\n" + ctx.agentMd else "") +
             "\n\nFORMAT WAJIB: balas HANYA dengan JSON satu baris: " +
@@ -102,10 +103,6 @@ object Brain {
             "jelaskan itu dengan santai kalau diminta toggle."
 
     fun sendEvent(ctx: Context, type: String, data: JSONObject, onReply: (JSONObject?) -> Unit) {
-        if (ctx.brainMode == "termux") {
-            HermesClient.sendEvent(ctx, type, data, onReply)
-            return
-        }
         when (type) {
             "tick" -> handleTick(ctx, data, onReply)
             "notification" -> handleNotification(ctx, data, onReply)

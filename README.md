@@ -1,113 +1,60 @@
 # 🐾 HermesPet
 
-Pet virtual cerdas yang jalan-jalan sebagai **overlay di atas semua aplikasi** di Android.
-
-**Dua mode otak** (bisa diganti di pengaturan aplikasi):
-
-1. **Standalone (default)** — APK langsung memanggil model Hermes lewat endpoint
-   OpenAI-compatible (Nous Portal `https://inference-api.nousresearch.com/v1`,
-   OpenRouter, atau apa pun). Cukup isi API key di pengaturan. **Tanpa Termux.**
-   Tanpa API key pun pet tetap hidup dengan balasan bawaan.
-2. **Termux** — event diteruskan ke hermes-agent yang berjalan di Termux lewat
-   HTTP `localhost` (arsitektur di bawah).
-
-```
-┌──────────────────────────────┐   HTTP 127.0.0.1:8765   ┌─────────────────────────┐
-│  APK HermesPet ("tubuh")     │ ◄─────────────────────► │  Termux ("otak")        │
-│  • Pet overlay: jalan, drag, │                         │  hermes_body_server.py  │
-│    pinch-resize, emosi,      │                         │   • panggil hermes-agent│
-│    gelembung bicara          │                         │   • ambil cuaca         │
-│  • Baca notifikasi           │                         │     (Open-Meteo)        │
-│  • Cek mood kamera depan     │                         │   • putuskan reaksi pet │
-│    tiap jam (ML Kit lokal)   │                         │                         │
-└──────────────────────────────┘                         └─────────────────────────┘
-```
+Pet virtual slime cerdas yang jalan-jalan sebagai **overlay di atas semua aplikasi**
+di Android. Bisa ngobrol, lihat layar, kontrol HP, dan punya perasaan — semua dalam
+**satu aplikasi Android**, tanpa Termux.
 
 ## Fitur
 
-- **Jalan-jalan di layar** — pet bergerak sendiri, bisa di-drag, di-tap (poke), dan
-  di-resize dengan pinch dua jari atau slider di pengaturan.
-- **Tahu cuaca** — otak mengambil data Open-Meteo (gratis, tanpa API key) dan pet
-  berkomentar.
-- **Baca notifikasi** — notifikasi diteruskan ke hermes-agent, pet bereaksi
-  (ada cooldown 2 menit supaya tidak cerewet).
-- **Cek mood tiap jam** *(opsional, mati secara default)* — kamera depan mengambil satu
-  frame, dianalisis **di HP** dengan ML Kit (senyum/mata terbuka). Foto hanya dikirim
-  ke agent kalau kamu mengaktifkan opsinya. Ingat: Android menampilkan indikator hijau
-  setiap kamera dipakai — itu normal.
+- **Slime hidup** — jalan ala Stardew, berganti warna sesuai mood, dilempar memantul,
+  bisa di-resize (pinch) & dipindah (drag), joget saat ada musik.
+- **Ngobrol** — tahan slime untuk kotak chat (ketik), double-tap untuk perintah suara;
+  jawabannya dibacakan (TTS) dan muncul mengetik.
+- **Lihat gambar** — Share foto ke HermesPet, atau tombol 👁, lalu pet menjelaskannya
+  (butuh model vision, lihat di bawah).
+- **Kontrol HP** — volume, senter, kecerahan, musik, buka aplikasi apa pun, panel
+  WiFi/Bluetooth, Jangan Ganggu, alarm, pengingat, catatan, cek lokasi/GPS.
+- **Indra** — notifikasi masuk, cuaca (ikut lokasi), cahaya, langkah, kalender, baterai,
+  cek mood lewat kamera depan (opsional).
+- **Rawat (Tamagotchi)** — kasih makan 🍬, dia senang; diabaikan, dia lesu.
+- **Memori & skill** — ingat hal penting tentangmu; bisa membuat skill/makro sendiri.
 
-## 🚀 Jalur cepat: pet tanpa APK (mulai dari sini!)
+## Pasang & jalankan
 
-Tidak perlu build apa-apa. Pakai [termux/hermespet_termux.py](termux/hermespet_termux.py) —
-pet tinggal di notifikasi persisten: baca notifikasimu, bersuara (TTS), lapor cuaca,
-cek kamera tiap jam, dan bisa diajak ngobrol lewat tombol di notifikasi.
-Petunjuk setup lengkap ada di komentar atas file itu. Ringkasnya:
+1. **Build APK** lewat GitHub Actions (tab Actions → unduh artifact `hermespet-debug-apk`),
+   atau buka proyek di Android Studio → Build APK.
+2. Instal di HP, buka **HermesPet**.
+3. Tekan **✨ Berikan semua izin** → ikuti panduannya.
+4. Isi **API key** AI (lihat di bawah) → **Simpan pengaturan otak**.
+5. Tekan **▶ Hidupkan pet**. Selesai 🐾
 
-```bash
-# 1. Instal aplikasi Termux:API dari F-Droid, beri dia akses notifikasi di Setelan Android
-pkg install python termux-api jq
-pip install requests
-mkdir -p ~/.hermespet
-cp hermespet_termux.py pet-chat.sh ~/.hermespet/ && chmod +x ~/.hermespet/pet-chat.sh
-nano ~/.hermespet/config        # isi HERMES_CMD, LAT, LON (lihat contoh di file .py)
-termux-wake-lock
-python ~/.hermespet/hermespet_termux.py
-```
+## Otak AI — pilih salah satu
 
-Kalau sudah puas dengan otaknya dan ingin badan visual yang jalan-jalan di layar,
-lanjut ke APK di bawah — keduanya memakai hermes-agent yang sama.
+HermesPet bicara ke endpoint **OpenAI-compatible**. Atur di pengaturan (Base URL, API
+key, Model).
 
-## Cara build APK
+**A. Cloud (paling mudah) — OpenRouter**
+- Base URL: `https://openrouter.ai/api/v1`
+- Model: mis. `google/gemini-flash-1.5` (murah, cepat, bisa lihat gambar)
+- Untuk fitur "lihat layar", isi juga **Model vision** dengan model multimodal.
 
-**Opsi A — GitHub Actions (tanpa instal apa-apa):**
-1. Push folder ini ke repo GitHub.
-2. Buka tab **Actions** → workflow "Build APK" jalan otomatis.
-3. Unduh artifact `hermespet-debug-apk`, salin ke HP, instal.
+**B. AI LOKAL di HP (tanpa internet, privat)**
+Ya, cukup unduh model **`.gguf`** lalu jalankan lewat aplikasi runtime lokal yang
+menyediakan **server OpenAI-compatible di `127.0.0.1`**, mis.:
+- **Llama.cpp (server)**, **LM Playground**, **MLCChat**, **SmolChat**, atau sejenis
+  yang punya opsi "OpenAI compatible server".
+1. Unduh model GGUF kecil yang muat di HP (mis. Qwen2.5-3B-Instruct Q4, Gemma-2-2B Q4,
+   Phi-3-mini Q4 — pilih ~2–4B parameter biar lancar).
+2. Jalankan server lokalnya (biasanya port `8080`).
+3. Di HermesPet, set Base URL ke `http://127.0.0.1:8080/v1`, Model = nama model lokalmu,
+   API key boleh diisi apa saja.
+> Catatan: model kecil lebih "polos" dari model cloud, tapi 100% offline & privat.
+> Vision lokal masih jarang — untuk "lihat gambar" tetap pakai model cloud multimodal.
 
-**Opsi B — Android Studio:** buka folder ini, biarkan sync, lalu **Build > Build APK(s)**.
+Tanpa API key pun pet tetap hidup dengan balasan bawaan (untuk coba-coba).
 
-## Setup di HP
+## Privasi & keamanan
 
-1. Instal APK, buka **HermesPet**.
-2. Beri izin: **overlay** (wajib), **baca notifikasi**, **kamera** (kalau mau cek mood),
-   dan izin notifikasi aplikasi (Android 13+).
-3. Di **Termux**:
-   ```bash
-   pkg install python
-   pip install flask requests
-   # lokasi untuk cuaca (contoh: Jakarta)
-   export LAT=-6.2 LON=106.8
-   # sambungkan hermes-agent-mu (prompt via stdin, jawaban via stdout):
-   export HERMES_CMD="hermes-agent --oneshot"   # ← sesuaikan dengan CLI agent-mu
-   python hermes_body_server.py
-   ```
-   Tanpa `HERMES_CMD`, server tetap jalan dengan balasan bawaan — bagus untuk tes awal.
-4. Kembali ke aplikasi → **▶ Hidupkan pet**. Selesai 🐾
-
-> Supaya server Termux tidak dimatikan sistem, jalankan `termux-wake-lock` dulu, dan
-> matikan optimasi baterai untuk Termux & HermesPet di pengaturan Android.
-
-## Protokol otak (kalau mau ganti server sendiri)
-
-`POST /pet/event` body:
-```json
-{"type": "tick|notification|mood|poke", "data": {...}, "ts": 1718...}
-```
-Balasan (semua field opsional; kosongkan untuk diam):
-```json
-{"say": "teks gelembung bicara", "emotion": "happy|sad|neutral|sleepy|surprised|love"}
-```
-
-| type | data |
-|---|---|
-| `tick` (tiap 1 menit) | `battery`, `hour` |
-| `notification` | `package`, `title`, `text` |
-| `mood` (tiap jam, opsional) | `face_detected`, `smile`, `eyes_open`, `mood_guess`, `image_b64?` |
-| `poke` (pet disentuh) | — |
-
-## Privasi
-
-- Semua komunikasi hanya lewat `127.0.0.1` — tidak ada data keluar HP kecuali
-  panggilan cuaca (koordinat saja) dan apa pun yang hermes-agent-mu sendiri lakukan.
-- Analisis wajah berjalan on-device; pengiriman foto ke agent adalah opt-in.
-- Isi notifikasi dikirim ke agent lokal — sadari ini kalau agent-mu memanggil LLM cloud.
+Lihat [PERMISSIONS.md](PERMISSIONS.md) untuk daftar izin & review keamanan. Ringkas:
+aksi nyata hanya jalan dari perintahmu langsung (bukan dari notifikasi), file dibatasi
+ke `Documents/HermesPet`, dan tidak ada kirim-SMS/transaksi otomatis.

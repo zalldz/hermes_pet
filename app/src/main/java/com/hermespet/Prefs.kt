@@ -7,15 +7,6 @@ object Prefs {
     private fun sp(ctx: Context): SharedPreferences =
         ctx.getSharedPreferences("hermespet", Context.MODE_PRIVATE)
 
-    var Context.agentUrl: String
-        get() = sp(this).getString("agent_url", "http://127.0.0.1:8765") ?: "http://127.0.0.1:8765"
-        set(v) = sp(this).edit().putString("agent_url", v).apply()
-
-    /** "api" = otak bawaan via endpoint OpenAI-compatible; "termux" = server di Termux */
-    var Context.brainMode: String
-        get() = sp(this).getString("brain_mode", "api") ?: "api"
-        set(v) = sp(this).edit().putString("brain_mode", v).apply()
-
     var Context.apiBaseUrl: String
         get() = sp(this).getString("api_base_url", "https://inference-api.nousresearch.com/v1")
             ?: "https://inference-api.nousresearch.com/v1"

@@ -34,6 +34,10 @@
 
     <uses-feature android:name="android.hardware.camera.front" android:required="false" />
 
+    <!-- agar pet bisa melihat & membuka SEMUA aplikasi terpasang -->
+    <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES"
+        tools:ignore="QueryAllPackagesPermission" />
+
     <!-- agar pet bisa mencari & membuka aplikasi lain ("buka YouTube") -->
     <queries>
         <intent>

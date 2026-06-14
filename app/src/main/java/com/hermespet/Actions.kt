@@ -133,9 +133,14 @@ object Actions {
         val pm = ctx.packageManager
         val launchables = pm.queryIntentActivities(
             Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER), 0)
-        val q = name.lowercase()
-        val match = launchables.firstOrNull { it.loadLabel(pm).toString().lowercase() == q }
-            ?: launchables.firstOrNull { it.loadLabel(pm).toString().lowercase().contains(q) }
+        val q = name.lowercase().trim()
+        fun lbl(r: android.content.pm.ResolveInfo) = r.loadLabel(pm).toString().lowercase()
+        // cocokkan: sama persis → diawali → mengandung → mengandung tanpa spasi
+        val match = launchables.firstOrNull { lbl(it) == q }
+            ?: launchables.firstOrNull { lbl(it).startsWith(q) }
+            ?: launchables.firstOrNull { lbl(it).contains(q) }
+            ?: launchables.firstOrNull { lbl(it).replace(" ", "").contains(q.replace(" ", "")) }
+            ?: launchables.firstOrNull { it.activityInfo.packageName.lowercase().contains(q) }
             ?: return "Aku nggak nemu aplikasi \"$name\" 😞"
         val label = match.loadLabel(pm)
         pm.getLaunchIntentForPackage(match.activityInfo.packageName)?.let {
