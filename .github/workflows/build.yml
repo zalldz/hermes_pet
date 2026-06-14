@@ -8,29 +8,26 @@ on:
 permissions:
   contents: write # untuk membuat GitHub Release
 
-# Jalankan semua JS action di Node.js 24 (Node 20 di-deprecate GitHub per Jun 2026)
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      # action di-pin ke major terbaru (sudah native Node.js 24 — Node 20 di-deprecate Jun 2026)
+      - uses: actions/checkout@v6
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: "17"
 
-      - uses: gradle/actions/setup-gradle@v4
+      - uses: gradle/actions/setup-gradle@v6
         with:
           gradle-version: "8.7"
 
       - name: Build debug APK (untuk sideload/uji)
         run: gradle assembleDebug
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: hermespet-debug-apk
           path: app/build/outputs/apk/debug/app-debug.apk
@@ -39,7 +36,7 @@ jobs:
       - name: Build release AAB (untuk Play Store)
         run: gradle bundleRelease
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: mocipet-release-aab
           path: app/build/outputs/bundle/release/app-release.aab
@@ -58,7 +55,7 @@ jobs:
           cp app/build/outputs/bundle/release/app-release.aab "release/mocipet-v${{ steps.ver.outputs.version }}.aab"
 
       - name: Publish GitHub Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: v${{ steps.ver.outputs.version }}
           name: Mocipet v${{ steps.ver.outputs.version }}
