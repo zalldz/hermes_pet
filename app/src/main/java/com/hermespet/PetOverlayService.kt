@@ -209,18 +209,17 @@ class PetOverlayService : Service() {
         }
         posX = lp.x.toFloat()
 
-        // gelembung bicara: window TERPISAH yang melebar dinamis mengikuti teks
+        // gelembung bicara gaya komik: window TERPISAH, melebar dinamis ikut teks,
+        // dengan ekor segitiga menunjuk ke pet
+        val comic = ComicBubble(resources.displayMetrics.density)
         bubble = TextView(this).apply {
-            setTextColor(Color.parseColor("#3E2723"))
+            setTextColor(Color.parseColor("#2B2B3A"))
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 15f)
-            background = GradientDrawable().apply {
-                setColor(Color.WHITE)
-                cornerRadius = dp(14f)
-                setStroke(3, Color.parseColor("#33334D"))
-            }
-            val px = dp(12f).toInt(); val py = dp(9f).toInt()
-            setPadding(px, py, px, py)
-            elevation = dp(6f)
+            setLineSpacing(dp(2f), 1f)
+            background = comic
+            val px = dp(14f).toInt(); val py = dp(10f).toInt()
+            // padding bawah ekstra untuk ruang ekor gelembung
+            setPadding(px, py, px, py + comic.tailHeightPx())
         }
         bubbleLp = WindowManager.LayoutParams(
             WindowManager.LayoutParams.WRAP_CONTENT, // lebar window ikut isi (dinamis)
@@ -333,39 +332,94 @@ class PetOverlayService : Service() {
             isSingleLine = true
             setTextColor(Color.parseColor("#3E2723"))
             setHintTextColor(Color.parseColor("#9E9E9E"))
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 15f)
+            background = GradientDrawable().apply {
+                setColor(Color.parseColor("#F4F3FA"))
+                cornerRadius = dp(12f)
+            }
+            val ip = dp(10f).toInt(); setPadding(ip, dp(8f).toInt(), ip, dp(8f).toInt())
         }
-        val feed = Button(this).apply { text = "🍬" } // kasih makan
-        val eye = Button(this).apply { text = "👁" }  // lihat layar
-        val fren = Button(this).apply { text = "📡" } // kirim teks ke teman di WiFi
-        val ptt = Button(this).apply { text = "🎙️" } // tahan = pesan suara ke teman
-        val send = Button(this).apply { text = "➤" }  // kirim ke AI (Moci)
-        val row = LinearLayout(this).apply {
+        // tombol-tombol bantu yang rata & ringkas (emoji + label biar jelas)
+        fun toolBtn(emoji: String, label: String) = Button(this).apply {
+            text = "$emoji\n$label"
+            isAllCaps = false
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
+            setTextColor(Color.parseColor("#3E2723"))
+            setLineSpacing(0f, 0.95f)
+            minWidth = 0; minimumWidth = 0
+            setPadding(0, dp(6f).toInt(), 0, dp(6f).toInt())
+            stateListAnimator = null
+            background = GradientDrawable().apply {
+                setColor(Color.parseColor("#EFEEF7"))
+                cornerRadius = dp(12f)
+            }
+        }
+        val feed = toolBtn("🍬", "Makan") // kasih makan
+        val eye = toolBtn("👁", "Lihat")  // lihat layar
+        val fren = toolBtn("📡", "Teman")  // kirim teks ke teman di WiFi
+        val ptt = toolBtn("🎙️", "Tahan")  // tahan = pesan suara ke teman
+        val send = Button(this).apply { // kirim ke AI (Moci)
+            text = "➤"; isAllCaps = false
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 18f)
+            setTextColor(Color.WHITE)
+            minWidth = 0; minimumWidth = 0
+            val sp = dp(14f).toInt(); setPadding(sp, dp(8f).toInt(), sp, dp(8f).toInt())
+            stateListAnimator = null
+            background = GradientDrawable().apply {
+                setColor(Color.parseColor("#5B6CF0"))
+                cornerRadius = dp(12f)
+            }
+        }
+
+        val gap = dp(6f).toInt()
+        val topRow = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            addView(input, LinearLayout.LayoutParams(0,
+                LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+            addView(send, LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { marginStart = gap })
+        }
+        fun cell(first: Boolean) = LinearLayout.LayoutParams(0,
+            LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply { if (!first) marginStart = gap }
+        val bottomRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            setPadding(0, dp(8f).toInt(), 0, 0)
+            addView(feed, cell(true))
+            addView(eye, cell(false))
+            addView(fren, cell(false))
+            addView(ptt, cell(false))
+        }
+        val row = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
             background = GradientDrawable().apply {
                 setColor(Color.WHITE)
-                cornerRadius = dp(16f)
-                setStroke(2, Color.parseColor("#33334D"))
+                cornerRadius = dp(20f)
+                setStroke(dp(2f).toInt(), Color.parseColor("#33334D"))
             }
-            val p = dp(6f).toInt()
+            val p = dp(10f).toInt()
             setPadding(p, p, p, p)
-            addView(input, LinearLayout.LayoutParams(dp(150f).toInt(),
-                LinearLayout.LayoutParams.WRAP_CONTENT))
-            addView(feed)
-            addView(eye)
-            addView(fren)
-            addView(ptt)
-            addView(send)
+            elevation = dp(8f)
+            addView(topRow)
+            addView(bottomRow)
         }
+        val screenW = resources.displayMetrics.widthPixels
+        val screenH = resources.displayMetrics.heightPixels
+        val panelW = (screenW * 0.92f).toInt().coerceAtMost(dp(360f).toInt())
         val clp = WindowManager.LayoutParams(
-            WindowManager.LayoutParams.WRAP_CONTENT,
+            panelW,
             WindowManager.LayoutParams.WRAP_CONTENT,
             WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
             WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL, // fokusable → keyboard bisa muncul
             PixelFormat.TRANSLUCENT
         ).apply {
             gravity = Gravity.TOP or Gravity.START
-            x = lp.x
-            y = lp.y + root.height + dp(4f).toInt()
+            x = (screenW - panelW) / 2 // selalu di tengah & utuh di layar
+            // taruh di bawah pet, tapi jangan masuk area keyboard (bawah layar)
+            y = (lp.y + root.height + dp(6f).toInt())
+                .coerceIn(dp(40f).toInt(), (screenH * 0.42f).toInt())
             softInputMode = WindowManager.LayoutParams.SOFT_INPUT_STATE_VISIBLE
         }
 
@@ -411,7 +465,7 @@ class PetOverlayService : Service() {
             when (ev.action) {
                 MotionEvent.ACTION_DOWN -> {
                     if (VoiceMsg.startRecording(this)) {
-                        ptt.text = "🔴"
+                        ptt.text = "🔴\nLepas"
                         say("🎙️ Merekam... lepas untuk kirim", PetView.Emotion.SURPRISED)
                         transientUntil = System.currentTimeMillis() + 30_000
                     } else {
@@ -421,7 +475,7 @@ class PetOverlayService : Service() {
                     true
                 }
                 MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
-                    ptt.text = "🎙️"
+                    ptt.text = "🎙️\nTahan"
                     val bytes = VoiceMsg.stopRecording()
                     if (bytes == null) {
                         say("Rekaman terlalu singkat 🙈", null)
@@ -969,7 +1023,10 @@ class PetOverlayService : Service() {
             val bh = bubble.height
             val petCenterX = lp.x + pet.width / 2
             bubbleLp.x = (petCenterX - bw / 2).coerceIn(dp(4f).toInt(), screenW - bw - dp(4f).toInt())
-            bubbleLp.y = (lp.y - bh - dp(6f).toInt()).coerceAtLeast(dp(24f).toInt())
+            // ekor menempel di atas pet (sedikit menimpa) agar terlihat menyatu
+            bubbleLp.y = (lp.y - bh + dp(4f).toInt()).coerceAtLeast(dp(24f).toInt())
+            // arahkan ujung ekor ke tengah pet (relatif terhadap kiri gelembung)
+            (bubble.background as? ComicBubble)?.tailX = (petCenterX - bubbleLp.x).toFloat()
             if (bubbleShown) runCatching { wm.updateViewLayout(bubble, bubbleLp) }
         }
     }
