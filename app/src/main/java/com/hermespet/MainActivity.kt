@@ -31,6 +31,7 @@ import com.hermespet.Prefs.musicDance
 import com.hermespet.Prefs.petScale
 import com.hermespet.Prefs.petVoice
 import com.hermespet.Prefs.sendMoodImage
+import com.hermespet.Prefs.setupDone
 import com.hermespet.Prefs.soulMd
 
 class MainActivity : Activity() {
@@ -76,6 +77,8 @@ class MainActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // pertama kali buka → tampilkan wizard setup ramah pemula
+        if (!setupDone) startActivity(Intent(this, WizardActivity::class.java))
         val pad = (16 * resources.displayMetrics.density).toInt()
 
         val col = LinearLayout(this).apply {
@@ -102,42 +105,57 @@ class MainActivity : Activity() {
         }
         col.addView(keyInput)
 
-        col.addView(TextView(this).apply { text = "Model:" })
+        col.addView(button("✅ Tes koneksi AI") {
+            apiKey = keyInput.text.toString().trim()
+            Brain.testConnection(this) { ok, msg ->
+                android.widget.Toast.makeText(this, (if (ok) "✅ " else "❌ ") + msg,
+                    android.widget.Toast.LENGTH_LONG).show()
+            }
+        })
+
+        // --- pengaturan lanjutan (disembunyikan dari pemula) ---
+        val adv = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; visibility = View.GONE }
+        col.addView(button("⚙️ Pengaturan lanjutan (model, base URL, SOUL/AGENT…)") {
+            adv.visibility = if (adv.visibility == View.GONE) View.VISIBLE else View.GONE
+        })
+        col.addView(adv)
+
+        adv.addView(TextView(this).apply { text = "Model:" })
         val modelInput = EditText(this).apply { setText(apiModel) }
-        col.addView(modelInput)
+        adv.addView(modelInput)
 
-        col.addView(TextView(this).apply { text = "Base URL API:" })
+        adv.addView(TextView(this).apply { text = "Base URL API:" })
         val baseInput = EditText(this).apply { setText(apiBaseUrl) }
-        col.addView(baseInput)
+        adv.addView(baseInput)
 
-        col.addView(TextView(this).apply {
+        adv.addView(TextView(this).apply {
             text = "Model embeddings — memori vektor (opsional, kosong = kata kunci):"
         })
         val embInput = EditText(this).apply {
             setText(embModel)
             hint = "mis. text-embedding-3-small"
         }
-        col.addView(embInput)
+        adv.addView(embInput)
 
-        col.addView(TextView(this).apply {
+        adv.addView(TextView(this).apply {
             text = "Model vision — untuk 'lihat layar' (wajib multimodal):"
         })
         val visionInput = EditText(this).apply {
             setText(visionModel)
             hint = "mis. google/gemini-flash-1.5 (kosong = model utama)"
         }
-        col.addView(visionInput)
+        adv.addView(visionInput)
 
-        col.addView(TextView(this).apply { text = "Lokasi untuk cuaca (lat, lon):" })
+        adv.addView(TextView(this).apply { text = "Lokasi untuk cuaca (lat, lon):" })
         val latInput = EditText(this).apply { setText(latitude); hint = "-6.2" }
         val lonInput = EditText(this).apply { setText(longitude); hint = "106.8" }
-        col.addView(LinearLayout(this).apply {
+        adv.addView(LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             addView(latInput, LinearLayout.LayoutParams(0, -2, 1f))
             addView(lonInput, LinearLayout.LayoutParams(0, -2, 1f))
         })
 
-        col.addView(TextView(this).apply {
+        adv.addView(TextView(this).apply {
             text = "SOUL.md — kepribadian pet (silakan edit sesukamu):"
         })
         val soulInput = EditText(this).apply {
@@ -146,12 +164,12 @@ class MainActivity : Activity() {
             gravity = android.view.Gravity.TOP
             textSize = 13f
         }
-        col.addView(soulInput)
-        col.addView(button("Kembalikan SOUL.md bawaan") {
+        adv.addView(soulInput)
+        adv.addView(button("Kembalikan SOUL.md bawaan") {
             soulInput.setText(Prefs.DEFAULT_SOUL)
         })
 
-        col.addView(TextView(this).apply {
+        adv.addView(TextView(this).apply {
             text = "AGENT.md — aturan & instruksi perilaku pet:"
         })
         val agentInput = EditText(this).apply {
@@ -160,8 +178,8 @@ class MainActivity : Activity() {
             gravity = android.view.Gravity.TOP
             textSize = 13f
         }
-        col.addView(agentInput)
-        col.addView(button("Kembalikan AGENT.md bawaan") {
+        adv.addView(agentInput)
+        adv.addView(button("Kembalikan AGENT.md bawaan") {
             agentInput.setText(Prefs.DEFAULT_AGENT)
         })
 
@@ -235,11 +253,20 @@ class MainActivity : Activity() {
         }
         col.addView(imgSwitch)
 
+        col.addView(button("❓ Cara main dengan pet") { Help.gestures(this) })
+        col.addView(button("🧙 Buka panduan setup (wizard)") {
+            startActivity(Intent(this, WizardActivity::class.java))
+        })
         col.addView(button("📜 Riwayat chat & log") {
             startActivity(Intent(this, LogActivity::class.java))
         })
         col.addView(button("🧠 Kelola memori & skill") {
             startActivity(Intent(this, ManagerActivity::class.java))
+        })
+        col.addView(button("🐞 Lihat catatan crash") {
+            val log = HermesApp.crashLog(application).ifBlank { "Belum ada crash 🎉" }
+            android.app.AlertDialog.Builder(this).setTitle("Catatan crash")
+                .setMessage(log.take(4000)).setPositiveButton("Tutup", null).show()
         })
 
         // --- start/stop ---

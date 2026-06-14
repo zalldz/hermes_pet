@@ -47,10 +47,15 @@
     </queries>
 
     <application
+        android:name=".HermesApp"
         android:label="HermesPet"
         android:icon="@mipmap/ic_launcher"
         android:usesCleartextTraffic="true"
         android:theme="@android:style/Theme.Material.Light">
+
+        <activity
+            android:name=".WizardActivity"
+            android:exported="false" />
 
         <activity
             android:name=".LogActivity"

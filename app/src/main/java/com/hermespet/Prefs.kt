@@ -7,6 +7,11 @@ object Prefs {
     private fun sp(ctx: Context): SharedPreferences =
         ctx.getSharedPreferences("hermespet", Context.MODE_PRIVATE)
 
+    /** Wizard setup sudah diselesaikan? (untuk tampil sekali di awal) */
+    var Context.setupDone: Boolean
+        get() = sp(this).getBoolean("setup_done", false)
+        set(v) = sp(this).edit().putBoolean("setup_done", v).apply()
+
     var Context.apiBaseUrl: String
         get() = sp(this).getString("api_base_url", "https://inference-api.nousresearch.com/v1")
             ?: "https://inference-api.nousresearch.com/v1"

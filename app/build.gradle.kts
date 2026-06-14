@@ -58,4 +58,8 @@ dependencies {
 
     // Deteksi wajah on-device (senyum, mata terbuka) — tanpa kirim data keluar HP
     implementation("com.google.mlkit:face-detection:16.1.7")
+
+    // unit test parser (tidak ikut ke APK)
+    testImplementation("junit:junit:4.13.2")
+    testImplementation("org.json:json:20231013")
 }

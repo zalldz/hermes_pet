@@ -143,7 +143,7 @@ object Brain {
             askHermes(ctx,
                 "Sebentar lagi ($eventMin menit) pemilikmu ada acara di kalender: \"$eventTitle\". " +
                     "Ingatkan dia dengan singkat dan semangat.",
-                "Psst, $eventMin menit lagi: $eventTitle ⏰", "surprised", onReply)
+                "Psst, $eventMin menit lagi: $eventTitle ⏰", "surprised", onReply = onReply)
             return
         }
         if (now - lastWeatherSay > WEATHER_INTERVAL_MS) {
@@ -160,7 +160,7 @@ object Brain {
                 askHermes(ctx,
                     "Cuaca sekarang $desc, suhu $temp°C.$extra " +
                         "Komentari singkat, beri saran kalau relevan (payung, istirahat, jalan-jalan, dll).",
-                    "Di luar $desc, $temp°C nih!", emo, onReply)
+                    "Di luar $desc, $temp°C nih!", emo, onReply = onReply)
             }
             return
         }
@@ -177,7 +177,7 @@ object Brain {
         askHermes(ctx,
             "Pemilikmu dapat notifikasi dari aplikasi $pkg: '$title: $text'. " +
                 "Komentari singkat dan relevan, ingatkan kalau kelihatan penting.",
-            "Psst, ada pesan: $title 👀", "surprised", onReply)
+            "Psst, ada pesan: $title 👀", "surprised", onReply = onReply)
     }
 
     private fun handleMood(ctx: Context, data: JSONObject, onReply: (JSONObject?) -> Unit) {
@@ -196,7 +196,7 @@ object Brain {
         askHermes(ctx,
             "Kamu baru melihat wajah pemilikmu lewat kamera depan. Tebakan mood: $guess " +
                 "(probabilitas senyum ${"%.2f".format(smile)}). Beri komentar empatik singkat.",
-            fallback.first, fallback.second, onReply)
+            fallback.first, fallback.second, onReply = onReply)
     }
 
     /** Memori percakapan: 6 tukar-kata terakhir disertakan sebagai konteks. */
@@ -273,7 +273,7 @@ object Brain {
             }
             if (onStream != null && ctx.apiKey.isNotBlank())
                 askHermesStream(ctx, prompt, fb, "love", onStream, onDone)
-            else askHermes(ctx, prompt, fb, "love", onDone)
+            else askHermes(ctx, prompt, fb, "love", surfaceErrors = true, onReply = onDone)
         }
     }
 
@@ -292,31 +292,75 @@ object Brain {
         askHermes(ctx,
             "Pemilikmu baru membuka HP setelah $away menit. Sekarang waktu $waktu (jam $hour). " +
                 "Sapa dia duluan dengan hangat & singkat, sesuai waktu.",
-            fallback, if (waktu == "malam") "sleepy" else "happy", onReply)
+            fallback, if (waktu == "malam") "sleepy" else "happy", onReply = onReply)
     }
 
     private fun handlePoke(ctx: Context, onReply: (JSONObject?) -> Unit) {
         val canned = listOf("Hihi geli! 😆", "Eh, apa? Aku lagi jalan-jalan nih!", "Poke balik! 🐾")
         askHermes(ctx, "Pemilikmu baru menyentuhmu (poke). Bereaksi singkat dan lucu.",
-            canned[Random.nextInt(canned.size)], "happy", onReply)
+            canned[Random.nextInt(canned.size)], "happy", onReply = onReply)
     }
 
     // ------------------------------------------------------------- LLM API
 
+    /** Uji koneksi & API key dengan satu permintaan kecil. onResult(sukses, pesan) di main. */
+    fun testConnection(ctx: Context, onResult: (Boolean, String) -> Unit) {
+        if (ctx.apiKey.isBlank()) { main.post { onResult(false, "API key masih kosong 🔑") }; return }
+        val body = JSONObject()
+            .put("model", ctx.apiModel)
+            .put("max_tokens", 5)
+            .put("messages", JSONArray().put(JSONObject().put("role", "user").put("content", "ping")))
+        val req = Request.Builder()
+            .url(ctx.apiBaseUrl.trimEnd('/') + "/chat/completions")
+            .header("Authorization", "Bearer ${ctx.apiKey}")
+            .post(body.toString().toRequestBody(jsonType))
+            .build()
+        http.newCall(req).enqueue(object : Callback {
+            override fun onFailure(call: Call, e: IOException) {
+                main.post { onResult(false, "Gagal konek 📡 (cek internet): ${e.message ?: ""}") }
+            }
+            override fun onResponse(call: Call, response: Response) {
+                val res = response.use { r ->
+                    when {
+                        r.isSuccessful -> true to "Berhasil! Koneksi & API key OK ✓"
+                        r.code == 401 || r.code == 403 -> false to "API key salah/ditolak (${r.code}) 🔑"
+                        r.code == 429 -> false to "Kuota/limit habis (429) 😵"
+                        else -> false to "Server menolak (kode ${r.code}) — cek Base URL/Model"
+                    }
+                }
+                main.post { onResult(res.first, res.second) }
+            }
+        })
+    }
+
+    /** Pesan error yang jelas (untuk chat). null = diam (event ambient). */
+    private fun errMsg(code: Int): String = when (code) {
+        401, 403 -> "🔑 API key-nya salah atau ditolak — cek lagi di pengaturan ya"
+        429 -> "😵 Kuota/limit AI-nya habis sebentar — coba lagi nanti"
+        in 500..599 -> "🔧 Server AI-nya lagi bermasalah, bukan salahmu kok"
+        -1 -> "📡 Waduh, aku nggak bisa nyambung ke internet/server"
+        -2 -> "🔑 Aku belum bisa mikir — isi API key dulu di pengaturan"
+        else -> "Hmm, ada kendala ($code) — coba lagi ya 🥺"
+    }
+
     private fun askHermes(
         ctx: Context, context: String,
         fallbackSay: String, fallbackEmotion: String,
+        surfaceErrors: Boolean = false,
         onReply: (JSONObject?) -> Unit
     ) {
+        // saat error: chat menampilkan pesan jelas; event ambient diam (null)
+        fun onErr(code: Int) =
+            if (surfaceErrors) reply(errMsg(code), "sad") else null
+
         val key = ctx.apiKey
         if (key.isBlank()) {
-            // tanpa API key pet tetap hidup dengan balasan bawaan
-            onReply(reply(fallbackSay, fallbackEmotion))
+            onReply(if (surfaceErrors) reply(errMsg(-2), "sad") else reply(fallbackSay, fallbackEmotion))
             return
         }
         val body = JSONObject()
             .put("model", ctx.apiModel)
-            .put("max_tokens", 700) // cukup untuk jawaban chat panjang tanpa terpotong
+            .put("max_tokens", 700)
             .put("temperature", 0.8)
             .put("messages", JSONArray()
                 .put(JSONObject().put("role", "system").put("content", systemPrompt(ctx)))
@@ -330,21 +374,24 @@ object Brain {
         http.newCall(req).enqueue(object : Callback {
             override fun onFailure(call: Call, e: IOException) {
                 Log.w(TAG, "api gagal: ${e.message}")
-                main.post { onReply(reply(fallbackSay, fallbackEmotion)) }
+                main.post { onReply(onErr(-1)) }
             }
 
             override fun onResponse(call: Call, response: Response) {
                 val parsed = try {
                     response.use { r ->
+                        if (!r.isSuccessful) return@use onErr(r.code)
                         val content = JSONObject(r.body?.string() ?: "{}")
                             .optJSONArray("choices")?.optJSONObject(0)
                             ?.optJSONObject("message")?.optString("content") ?: ""
-                        extractJson(content)
+                        extractJson(content) ?: if (surfaceErrors) reply(content.take(400)
+                            .ifBlank { "Hmm, aku bingung jawabnya 🤔" }, "neutral")
+                        else reply(fallbackSay, fallbackEmotion)
                     }
                 } catch (e: Exception) {
-                    Log.w(TAG, "parse gagal: ${e.message}"); null
+                    Log.w(TAG, "parse gagal: ${e.message}"); onErr(0)
                 }
-                main.post { onReply(parsed ?: reply(fallbackSay, fallbackEmotion)) }
+                main.post { onReply(parsed) }
             }
         })
     }
@@ -371,7 +418,7 @@ object Brain {
 
         http.newCall(req).enqueue(object : Callback {
             override fun onFailure(call: Call, e: IOException) {
-                main.post { onReply(reply(fallbackSay, fallbackEmotion)) }
+                main.post { onReply(reply(errMsg(-1), "sad")) }
             }
 
             override fun onResponse(call: Call, response: Response) {
@@ -379,6 +426,10 @@ object Brain {
                 var lastSay = ""
                 try {
                     response.use { r ->
+                        if (!r.isSuccessful) {
+                            main.post { onReply(reply(errMsg(r.code), "sad")) }
+                            return
+                        }
                         val source = r.body?.source() ?: return@use
                         while (!source.exhausted()) {
                             val line = source.readUtf8Line() ?: break
@@ -410,51 +461,10 @@ object Brain {
         })
     }
 
-    /** Ekstrak nilai "say" (bisa parsial) dari JSON yang masih mengalir. */
-    private fun extractPartialSay(s: String): String? {
-        var i = s.indexOf("\"say\"")
-        if (i < 0) return null
-        i = s.indexOf(':', i)
-        if (i < 0) return null
-        i++
-        while (i < s.length && (s[i] == ' ' || s[i] == '\n' || s[i] == '\t')) i++
-        if (i >= s.length || s[i] != '"') return null
-        i++
-        val out = StringBuilder()
-        var j = i
-        while (j < s.length) {
-            val c = s[j]
-            if (c == '\\' && j + 1 < s.length) {
-                out.append(when (s[j + 1]) { 'n' -> '\n'; 't' -> '\t'; '"' -> '"'; '\\' -> '\\'; else -> s[j + 1] })
-                j += 2; continue
-            }
-            if (c == '"') break // tutup → say lengkap
-            out.append(c); j++
-        }
-        return out.toString()
-    }
-
-    /** Ambil objek JSON pertama dari teks jawaban model. */
-    private fun extractJson(text: String): JSONObject? {
-        val start = text.indexOf('{')
-        val end = text.lastIndexOf('}')
-        if (start < 0 || end <= start) return null
-        return try {
-            val obj = JSONObject(text.substring(start, end + 1))
-            if (!obj.has("say")) return null
-            val r = reply(obj.optString("say").take(1500), obj.optString("emotion", "neutral"))
-            obj.optJSONObject("action")?.let { r.put("action", it) }
-            obj.optJSONArray("actions")?.let { r.put("actions", it) } // multi-step
-            obj.optJSONObject("remember")?.let { r.put("remember", it) } // auto-memori
-            r
-        } catch (e: Exception) { null }
-    }
-
-    private fun reply(say: String?, emotion: String?): JSONObject =
-        JSONObject().apply {
-            say?.let { put("say", it) }
-            emotion?.let { put("emotion", it) }
-        }
+    // parsing dipindah ke [Parsers] (bisa di-unit-test) — ini hanya delegasi
+    private fun extractPartialSay(s: String): String? = Parsers.extractPartialSay(s)
+    private fun extractJson(text: String): JSONObject? = Parsers.extractJson(text)
+    private fun reply(say: String?, emotion: String?): JSONObject = Parsers.reply(say, emotion)
 
     // ------------------------------------------------------------- cuaca
 
