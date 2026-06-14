@@ -295,17 +295,21 @@ object Brain {
         fallbackSay: String, fallbackEmotion: String,
         onReply: (JSONObject?) -> Unit
     ) {
-        // --- AI LOKAL on-device (MediaPipe .task) ---
+        // --- AI LOKAL on-device (MediaPipe .litertlm) ---
         if (ctx.useLocalAi && ctx.localModelPath.isNotBlank()) {
             Thread {
                 val ok = LocalBrain.ensureLoaded(ctx, ctx.localModelPath)
                 val parsed = if (!ok) {
-                    reply("Model lokalku belum termuat — cek path .task di pengaturan 🥺", "sad")
+                    reply("Model lokalku belum termuat — cek path .litertlm di pengaturan 🥺", "sad")
                 } else {
-                    val prompt = systemPrompt(ctx) + "\n\nPemilik: " + context +
-                        "\nKamu (balas HANYA JSON sesuai format di atas):"
-                    LocalBrain.generate(prompt)?.let { extractJson(it) }
-                        ?: reply(fallbackSay, fallbackEmotion)
+                    // PROMPT PENDEK: model kecil mudah overflow/crash dgn prompt panjang.
+                    // Tanpa paksa JSON (model kecil sering gagal format) — teks mentah jadi ucapan.
+                    val persona = ctx.soulMd.take(300)
+                    val prompt = "$persona\nJawab SINGKAT & ramah dalam bahasa Indonesia.\n" +
+                        "Pemilik: ${context.take(400)}\nKamu:"
+                    val raw = LocalBrain.generate(prompt)?.trim()
+                    if (raw.isNullOrBlank()) reply(fallbackSay, fallbackEmotion)
+                    else reply(raw.take(300), "neutral")
                 }
                 main.post { onReply(parsed) }
             }.start()

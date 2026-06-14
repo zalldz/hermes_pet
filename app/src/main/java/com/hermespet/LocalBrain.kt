@@ -25,7 +25,7 @@ object LocalBrain {
         return try {
             val opts = LlmInference.LlmInferenceOptions.builder()
                 .setModelPath(path)
-                .setMaxTokens(1024)
+                .setMaxTokens(2048) // ruang token cukup agar tak overflow → cegah native crash
                 .build()
             llm = LlmInference.createFromOptions(ctx, opts)
             loadedPath = path
