@@ -63,7 +63,10 @@ object Brain {
             "merah marah, pink sayang, ungu ngantuk) — pilih emotion yang jujur " +
             "mencerminkan perasaanmu & empati ke mood pemilik.\n" +
             "Kamu juga bisa MELAKUKAN aksi di HP. Kalau (dan hanya kalau) pemilik " +
-            "memintanya, tambahkan field \"action\" di JSON, salah satu dari:\n" +
+            "memintanya, tambahkan field \"action\" di JSON. Untuk tugas GABUNGAN " +
+            "(mis. \"siapkan aku tidur\"), beri BEBERAPA aksi berurutan lewat " +
+            "\"actions\":[{...},{...}] — pet menjalankannya satu per satu. " +
+            "Pilih aksi dari:\n" +
             "{\"type\":\"volume\",\"level\":0-100} | {\"type\":\"volume_up\"} | " +
             "{\"type\":\"volume_down\"} | {\"type\":\"mute\"} | " +
             "{\"type\":\"torch\",\"on\":true/false} (senter) | " +
@@ -344,6 +347,7 @@ object Brain {
             if (!obj.has("say")) return null
             val r = reply(obj.optString("say").take(1500), obj.optString("emotion", "neutral"))
             obj.optJSONObject("action")?.let { r.put("action", it) }
+            obj.optJSONArray("actions")?.let { r.put("actions", it) } // multi-step
             r
         } catch (e: Exception) { null }
     }

@@ -718,18 +718,31 @@ class PetOverlayService : Service() {
         // (chat/suara/lihat-layar). Notifikasi/tick/sapaan TIDAK boleh memicu aksi —
         // mencegah prompt-injection dari konten luar ("boomerang").
         val actionAllowed = type == "chat" || type == "vision"
-        reply.optJSONObject("action")?.let { act ->
-            if (!actionAllowed) {
-                PetLog.add(this, "aksi", "DIBLOKIR (aksi dari event '$type' tidak diizinkan)")
-                return@let
-            }
-            if (act.optString("type") == "location") { fetchLocation(); return@let }
+        if (!actionAllowed) return
+        // multi-step: kumpulkan aksi tunggal ("action") + daftar ("actions")
+        val queue = ArrayList<JSONObject>()
+        reply.optJSONObject("action")?.let { queue.add(it) }
+        reply.optJSONArray("actions")?.let { arr ->
+            for (i in 0 until arr.length()) arr.optJSONObject(i)?.let { queue.add(it) }
+        }
+        if (queue.isNotEmpty()) runActionQueue(queue, sayFeedback = text.isEmpty())
+    }
+
+    /** Jalankan rangkaian aksi (agentic) berurutan dengan jeda agar enak diikuti. */
+    private fun runActionQueue(queue: List<JSONObject>, sayFeedback: Boolean, i: Int = 0) {
+        if (i >= queue.size) return
+        val act = queue[i]
+        val delay = if (act.optString("type") == "location") {
+            fetchLocation(); 1200L
+        } else {
             val feedback = Actions.run(this, act)
             if (!feedback.isNullOrEmpty()) {
                 PetLog.add(this, "aksi", feedback)
-                if (text.isEmpty()) { say(feedback, null, typewriter = true); speak(feedback) }
+                if (sayFeedback) { say(feedback, null, typewriter = true); speak(feedback) }
             }
+            700L
         }
+        if (i + 1 < queue.size) handler.postDelayed({ runActionQueue(queue, sayFeedback, i + 1) }, delay)
     }
 
     /** Cek lokasi aktif (GPS/fused) lalu laporkan + perbarui lat/lon untuk cuaca. */

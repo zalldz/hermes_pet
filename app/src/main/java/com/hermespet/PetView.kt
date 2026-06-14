@@ -4,6 +4,7 @@ import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
+import android.graphics.Path
 import android.view.View
 import kotlin.math.sin
 import kotlin.random.Random
@@ -18,7 +19,7 @@ class PetView(context: Context) : View(context) {
     enum class Emotion { NEUTRAL, HAPPY, SAD, SLEEPY, SURPRISED, LOVE, ANGRY }
 
     var emotion: Emotion = Emotion.NEUTRAL
-        set(v) { field = v; invalidate() }
+        set(v) { if (field != v) onEmotionChange(v); field = v; invalidate() }
 
     var facing: Int = 1
 
@@ -92,11 +93,46 @@ class PetView(context: Context) : View(context) {
     var beat = 0f
 
 
+    // --- partikel reaksi (hati/percik/marah) ---
+    private class Particle(var x: Float, var y: Float, var vx: Float, var vy: Float,
+                           var life: Float, val kind: Char)
+    private val particles = ArrayList<Particle>()
+    private val sparkP = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#FFE082") }
+    private var vw = 0f; private var vh = 0f
+
+    private fun onEmotionChange(v: Emotion) {
+        val kind = when (v) {
+            Emotion.LOVE -> 'H'; Emotion.HAPPY -> 'S'
+            Emotion.SURPRISED -> 'S'; Emotion.ANGRY -> 'A'; else -> return
+        }
+        spawnParticles(kind, if (kind == 'A') 5 else 6)
+    }
+
+    private fun spawnParticles(kind: Char, n: Int) {
+        if (vw <= 0f) return
+        repeat(n) {
+            val px = vw * (0.3f + Random.nextFloat() * 0.4f)
+            val py = vh * 0.35f
+            particles.add(Particle(px, py,
+                (Random.nextFloat() - 0.5f) * vw * 0.012f,
+                -vh * (0.006f + Random.nextFloat() * 0.006f),
+                1f, kind))
+        }
+    }
+
     private val animator = object : Runnable {
         override fun run() {
             phase += 0.13f
             if (impact > 0.01f) impact *= 0.82f else impact = 0f
             if (beat > 0.01f) beat *= 0.86f else beat = 0f // luruh antar-ketukan
+            if (particles.isNotEmpty()) {
+                val it = particles.iterator()
+                while (it.hasNext()) {
+                    val p = it.next()
+                    p.x += p.vx; p.y += p.vy; p.vy += vh * 0.0002f; p.life -= 0.02f
+                    if (p.life <= 0f) it.remove()
+                }
+            }
             val now = System.currentTimeMillis()
             if (now > nextBlinkAt) {
                 blink = !blink
@@ -139,6 +175,7 @@ class PetView(context: Context) : View(context) {
     override fun onDraw(canvas: Canvas) {
         val w = width.toFloat()
         val h = height.toFloat()
+        vw = w; vh = h
         // sprite hanya mengisi ~66% View → sisakan ruang (4 sel tiap sisi) agar
         // squash/stretch/condong/lompat tidak terpotong tepi (penyebab "kepotong")
         cell = minOf(w, h) / 24f
@@ -260,6 +297,32 @@ class PetView(context: Context) : View(context) {
         }
 
         canvas.restore()
+
+        // partikel reaksi (di atas tubuh, koordinat layar)
+        for (p in particles) {
+            val a = (p.life.coerceIn(0f, 1f) * 255).toInt()
+            val s = cell * 1.6f
+            when (p.kind) {
+                'H' -> { heart.alpha = a; drawHeartAt(canvas, p.x, p.y, s) }
+                'A' -> { angryC.alpha = a; canvas.drawCircle(p.x, p.y, s * 0.45f, angryC) }
+                else -> { sparkP.alpha = a; drawSpark(canvas, p.x, p.y, s * 0.7f) }
+            }
+        }
+        heart.alpha = 255; angryC.alpha = 255; sparkP.alpha = 255
+    }
+
+    private fun drawHeartAt(canvas: Canvas, cx: Float, cy: Float, s: Float) {
+        canvas.drawCircle(cx - s * 0.3f, cy - s * 0.15f, s * 0.35f, heart)
+        canvas.drawCircle(cx + s * 0.3f, cy - s * 0.15f, s * 0.35f, heart)
+        val path = Path().apply {
+            moveTo(cx - s * 0.6f, cy); lineTo(cx, cy + s * 0.6f); lineTo(cx + s * 0.6f, cy); close()
+        }
+        canvas.drawPath(path, heart)
+    }
+
+    private fun drawSpark(canvas: Canvas, cx: Float, cy: Float, s: Float) {
+        canvas.drawRect(cx - s * 0.12f, cy - s, cx + s * 0.12f, cy + s, sparkP)
+        canvas.drawRect(cx - s, cy - s * 0.12f, cx + s, cy + s * 0.12f, sparkP)
     }
 
     private fun drawPixelHeart(canvas: Canvas, col: Int, row: Int) {
