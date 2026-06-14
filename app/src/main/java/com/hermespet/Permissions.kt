@@ -46,10 +46,6 @@ object Permissions {
 
     fun writeSettings(ctx: Context) = Settings.System.canWrite(ctx)
 
-    fun allFiles(ctx: Context) =
-        if (Build.VERSION.SDK_INT >= 30) Environment.isExternalStorageManager()
-        else has(ctx, Manifest.permission.WRITE_EXTERNAL_STORAGE)
-
     fun dnd(ctx: Context) =
         (ctx.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager)
             .isNotificationPolicyAccessGranted
@@ -78,7 +74,6 @@ object Permissions {
         Perm("Notifikasi aplikasi",
             Build.VERSION.SDK_INT < 33 || has(ctx, Manifest.permission.POST_NOTIFICATIONS), false),
         Perm("Ubah setelan sistem (kecerahan)", writeSettings(ctx), false),
-        Perm("Semua file (catatan)", allFiles(ctx), false),
         Perm("Jangan Ganggu (DND)", dnd(ctx), false),
         Perm("Alarm tepat waktu (pengingat)", exactAlarm(ctx), false),
         Perm("Abaikan optimasi baterai", batteryOk(ctx), essential = true),
@@ -104,8 +99,6 @@ object Permissions {
             Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
         if (!writeSettings(ctx)) add("Ubah setelan sistem" to
             Intent(Settings.ACTION_MANAGE_WRITE_SETTINGS, pkg))
-        if (!allFiles(ctx) && Build.VERSION.SDK_INT >= 30) add("Semua file" to
-            Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION, pkg))
         if (!dnd(ctx)) add("Jangan Ganggu" to
             Intent(Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS))
         if (!batteryOk(ctx)) add("Optimasi baterai" to

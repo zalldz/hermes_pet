@@ -11,8 +11,8 @@ android {
         applicationId = "com.hermespet"
         minSdk = 26
         targetSdk = 34
-        versionCode = 10
-        versionName = "1.0"
+        versionCode = 11
+        versionName = "1.1"
     }
 
     // kunci debug tetap (di-commit) supaya semua build CI bertanda tangan sama

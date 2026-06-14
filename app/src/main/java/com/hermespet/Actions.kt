@@ -239,39 +239,22 @@ object Actions {
 
     // ------------------------------------------------------------- catatan (storage)
 
-    private fun storageOk(ctx: Context): Boolean =
-        if (Build.VERSION.SDK_INT >= 30) android.os.Environment.isExternalStorageManager()
-        else ctx.checkSelfPermission(android.Manifest.permission.WRITE_EXTERNAL_STORAGE) ==
-            android.content.pm.PackageManager.PERMISSION_GRANTED
-
-    private fun askStorage(ctx: Context): String {
-        if (Build.VERSION.SDK_INT >= 30) {
-            ctx.startActivity(
-                Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION,
-                    android.net.Uri.parse("package:${ctx.packageName}"))
-                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-        }
-        return "Beri aku izin 'Akses semua file' dulu ya (kubukakan halamannya) 🙏"
-    }
-
-    private fun noteDir(): java.io.File = java.io.File(
-        android.os.Environment.getExternalStoragePublicDirectory(
-            android.os.Environment.DIRECTORY_DOCUMENTS), "Mocipet")
+    // catatan disimpan di folder privat aplikasi (TANPA izin — ramah Play Store)
+    private fun noteDir(ctx: Context): java.io.File =
+        java.io.File(ctx.getExternalFilesDir(android.os.Environment.DIRECTORY_DOCUMENTS)
+            ?: ctx.filesDir, "catatan").apply { mkdirs() }
 
     private fun safeName(filename: String): String =
         filename.replace(Regex("[^A-Za-z0-9._ -]"), "_").ifBlank { "catatan.txt" }
 
     private fun saveNote(ctx: Context, filename: String, text: String): String {
         if (text.isBlank()) return "Catat apa? 🤔"
-        if (!storageOk(ctx)) return askStorage(ctx)
-        val dir = noteDir().apply { mkdirs() }
-        java.io.File(dir, safeName(filename)).appendText(text + "\n")
-        return "Kucatat di Documents/Mocipet/${safeName(filename)} 📝"
+        java.io.File(noteDir(ctx), safeName(filename)).appendText(text + "\n")
+        return "Sudah kucatat: ${safeName(filename)} 📝"
     }
 
     private fun readNote(ctx: Context, filename: String): String {
-        if (!storageOk(ctx)) return askStorage(ctx)
-        val f = java.io.File(noteDir(), safeName(filename))
+        val f = java.io.File(noteDir(ctx), safeName(filename))
         if (!f.exists()) return "Catatan ${safeName(filename)} belum ada 🤔"
         return "Isi ${safeName(filename)}:\n" + f.readText().takeLast(1000)
     }

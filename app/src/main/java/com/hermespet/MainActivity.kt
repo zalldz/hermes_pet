@@ -262,6 +262,19 @@ class MainActivity : Activity() {
             toastStatus("Pet dimatikan")
         })
 
+        // --- tentang ---
+        col.addView(section("5. Tentang"))
+        val ver = runCatching {
+            packageManager.getPackageInfo(packageName, 0).versionName
+        }.getOrNull() ?: "?"
+        col.addView(TextView(this).apply { text = "Mocipet v$ver — pet bernama Moci 🍡" })
+        col.addView(button("📜 Kebijakan privasi") {
+            runCatching {
+                startActivity(Intent(Intent.ACTION_VIEW,
+                    Uri.parse("https://github.com/zalldz/hermes_pet/blob/main/PRIVACY.md")))
+            }
+        })
+
         refreshStatus()
     }
 

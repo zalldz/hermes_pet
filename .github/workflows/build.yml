@@ -20,10 +20,19 @@ jobs:
         with:
           gradle-version: "8.7"
 
-      - name: Build debug APK
+      - name: Build debug APK (untuk sideload/uji)
         run: gradle assembleDebug
 
       - uses: actions/upload-artifact@v4
         with:
           name: hermespet-debug-apk
           path: app/build/outputs/apk/debug/app-debug.apk
+
+      # AAB rilis bertanda tangan — artefak siap unggah ke Play Console
+      - name: Build release AAB (untuk Play Store)
+        run: gradle bundleRelease
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mocipet-release-aab
+          path: app/build/outputs/bundle/release/app-release.aab
