@@ -7,10 +7,10 @@ import android.util.Log
 import com.hermespet.Prefs.apiBaseUrl
 import com.hermespet.Prefs.apiKey
 import com.hermespet.Prefs.apiModel
+import com.hermespet.Prefs.aiMode
 import com.hermespet.Prefs.latitude
 import com.hermespet.Prefs.localModelPath
 import com.hermespet.Prefs.longitude
-import com.hermespet.Prefs.useLocalAi
 import com.hermespet.Prefs.agentMd
 import com.hermespet.Prefs.soulMd
 import com.hermespet.Prefs.visionModel
@@ -239,8 +239,49 @@ object Brain {
         })
     }
 
+    /** Daftar aksi ringkas untuk model lokal (function-calling). */
+    private val LOCAL_ACTIONS = setOf(
+        "torch", "volume", "mute", "brightness", "media", "open_app", "dnd",
+        "wifi_panel", "bluetooth_panel", "set_alarm", "set_reminder", "location",
+        "open_url", "web_search", "whatsapp"
+    )
+
     private fun handleChat(ctx: Context, data: JSONObject, onReply: (JSONObject?) -> Unit) {
         val text = data.optString("text").take(500)
+
+        // --- HYBRID: coba model lokal sebagai pemetaan-aksi cepat & offline dulu ---
+        if (ctx.aiMode == "hybrid" && ctx.localModelPath.isNotBlank()) {
+            Thread {
+                val p = "Ubah perintah pemilik jadi SATU aksi JSON bila itu perintah mengatur HP, " +
+                    "atau {} bila bukan (mis. obrolan/pertanyaan).\n" +
+                    "Aksi yang ada: {\"type\":\"torch\",\"on\":true|false} senter | " +
+                    "{\"type\":\"volume\",\"level\":0-100} | {\"type\":\"mute\"} | " +
+                    "{\"type\":\"brightness\",\"level\":0-100} | " +
+                    "{\"type\":\"media\",\"cmd\":\"play_pause|next|prev\"} | " +
+                    "{\"type\":\"open_app\",\"name\":\"...\"} | {\"type\":\"dnd\",\"on\":true|false} | " +
+                    "{\"type\":\"wifi_panel\"} | {\"type\":\"bluetooth_panel\"} | " +
+                    "{\"type\":\"set_alarm\",\"hour\":0-23,\"minute\":0-59} | " +
+                    "{\"type\":\"web_search\",\"query\":\"...\"}\n" +
+                    "Perintah: \"$text\"\nJSON:"
+                val raw = LocalBrain.generate(ctx, ctx.localModelPath, p)
+                val action = raw?.let { extractActionJson(it) }
+                if (action != null && LOCAL_ACTIONS.contains(action.optString("type"))) {
+                    // aksi dikenali → jalankan OFFLINE, tandai engine lokal (hijau)
+                    main.post {
+                        onReply(JSONObject().put("say", "").put("emotion", "happy")
+                            .put("engine", "local").put("action", action))
+                    }
+                } else {
+                    // bukan perintah HP / model ragu → serahkan ke cloud (biru)
+                    main.post { cloudChat(ctx, text, onReply) }
+                }
+            }.start()
+            return
+        }
+        cloudChat(ctx, text, onReply)
+    }
+
+    private fun cloudChat(ctx: Context, text: String, onReply: (JSONObject?) -> Unit) {
         val history = if (chatHistory.isEmpty()) "" else
             "Percakapan kalian sebelumnya:\n" + chatHistory.joinToString("\n") {
                 "Pemilik: ${it.first}\nKamu: ${it.second}"
@@ -293,19 +334,23 @@ object Brain {
     private fun askHermes(
         ctx: Context, context: String,
         fallbackSay: String, fallbackEmotion: String,
-        onReply: (JSONObject?) -> Unit
+        rawOnReply: (JSONObject?) -> Unit
     ) {
-        // --- AI LOKAL on-device (MediaPipe .litertlm) di proses ":llm" terisolasi ---
-        if (ctx.useLocalAi && ctx.localModelPath.isNotBlank()) {
+        // stempel sumber otak ("engine") ke balasan untuk indikator warna
+        val eng = if (ctx.aiMode == "local") "local" else "cloud"
+        val onReply: (JSONObject?) -> Unit = { r ->
+            r?.let { if (!it.has("engine")) it.put("engine", eng) }
+            rawOnReply(r)
+        }
+        // --- AI LOKAL on-device (mode "local"): obrolan via model lokal ---
+        if (ctx.aiMode == "local" && ctx.localModelPath.isNotBlank()) {
             Thread {
-                // prompt ringkas (model kecil mudah overflow); tanpa paksa JSON
                 val persona = ctx.soulMd.take(300)
                 val prompt = "$persona\nJawab SINGKAT & ramah dalam bahasa Indonesia.\n" +
                     "Pemilik: ${context.take(400)}\nKamu:"
                 val raw = LocalBrain.generate(ctx, ctx.localModelPath, prompt)?.trim()
                 val parsed = if (raw.isNullOrBlank())
-                    reply("Aduh, AI lokalku gagal jalan 🥺 (model mungkin tak cocok — coba " +
-                        "model lain, atau matikan AI lokal untuk pakai cloud)", "sad")
+                    reply("Aduh, AI lokalku gagal jalan 🥺 (model mungkin tak cocok)", "sad")
                 else reply(raw.take(300), "neutral")
                 main.post { onReply(parsed) }
             }.start()
@@ -363,6 +408,17 @@ object Brain {
             val r = reply(obj.optString("say").take(1500), obj.optString("emotion", "neutral"))
             obj.optJSONObject("action")?.let { r.put("action", it) }
             r
+        } catch (e: Exception) { null }
+    }
+
+    /** Ambil objek JSON aksi pertama (punya field "type") dari teks model lokal. */
+    private fun extractActionJson(text: String): JSONObject? {
+        val start = text.indexOf('{')
+        val end = text.lastIndexOf('}')
+        if (start < 0 || end <= start) return null
+        return try {
+            val o = JSONObject(text.substring(start, end + 1))
+            if (o.has("type")) o else null
         } catch (e: Exception) { null }
     }
 

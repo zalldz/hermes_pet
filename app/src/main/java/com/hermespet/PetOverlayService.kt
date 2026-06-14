@@ -701,6 +701,8 @@ class PetOverlayService : Service() {
     /** Terapkan balasan otak: emosi+mood, ucapan, dan aksi nyata. Dipakai chat & vision. */
     private fun applyReply(type: String, reply: JSONObject?) {
         reply ?: return
+        // indikator sumber otak (hijau=lokal/offline, biru=cloud)
+        reply.optString("engine", "").takeIf { it.isNotEmpty() }?.let { pet.engine = it }
         val emotion = reply.optString("emotion", "")
         if (emotion.isNotEmpty()) {
             val emo = PetView.emotionFrom(emotion)

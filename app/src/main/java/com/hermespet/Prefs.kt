@@ -7,10 +7,10 @@ object Prefs {
     private fun sp(ctx: Context): SharedPreferences =
         ctx.getSharedPreferences("hermespet", Context.MODE_PRIVATE)
 
-    /** Pakai AI lokal on-device (MediaPipe .task) alih-alih API cloud. */
-    var Context.useLocalAi: Boolean
-        get() = sp(this).getBoolean("use_local_ai", false)
-        set(v) = sp(this).edit().putBoolean("use_local_ai", v).apply()
+    /** Mode otak: "cloud" | "local" | "hybrid" (lokal untuk aksi ringan, cloud untuk kompleks). */
+    var Context.aiMode: String
+        get() = sp(this).getString("ai_mode", "cloud") ?: "cloud"
+        set(v) = sp(this).edit().putString("ai_mode", v).apply()
 
     /** Path file model .task lokal (mis. /sdcard/Download/gemma3-1b.task). */
     var Context.localModelPath: String

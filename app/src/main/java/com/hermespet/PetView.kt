@@ -91,6 +91,15 @@ class PetView(context: Context) : View(context) {
     /** Energi musik 0..1 → slime ikut bergoyang (di-set service dari Visualizer). */
     var beat = 0f
 
+    /** Sumber otak balasan terakhir: "local" (hijau) / "cloud" (biru) / "" (tak ada). */
+    var engine: String = ""
+        set(v) { field = v; invalidate() }
+
+    private val engineDot = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val engineRing = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE; color = Color.parseColor("#33334D")
+    }
+
     private val animator = object : Runnable {
         override fun run() {
             phase += 0.13f
@@ -259,6 +268,18 @@ class PetView(context: Context) : View(context) {
         }
 
         canvas.restore()
+
+        // indikator sumber otak (titik kecil di pojok kanan-atas, di luar tubuh)
+        if (engine.isNotEmpty()) {
+            engineDot.color = if (engine == "local") Color.parseColor("#27C36B") // hijau = offline
+            else Color.parseColor("#3FA9F5")                                     // biru = cloud
+            val r = cell * 1.4f
+            val cx = offX + cell * 16f - r
+            val cy = offY + r
+            engineRing.strokeWidth = cell * 0.4f
+            canvas.drawCircle(cx, cy, r, engineDot)
+            canvas.drawCircle(cx, cy, r, engineRing)
+        }
     }
 
     private fun drawPixelHeart(canvas: Canvas, col: Int, row: Int) {
