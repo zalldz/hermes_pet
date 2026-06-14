@@ -295,22 +295,18 @@ object Brain {
         fallbackSay: String, fallbackEmotion: String,
         onReply: (JSONObject?) -> Unit
     ) {
-        // --- AI LOKAL on-device (MediaPipe .litertlm) ---
+        // --- AI LOKAL on-device (MediaPipe .litertlm) di proses ":llm" terisolasi ---
         if (ctx.useLocalAi && ctx.localModelPath.isNotBlank()) {
             Thread {
-                val ok = LocalBrain.ensureLoaded(ctx, ctx.localModelPath)
-                val parsed = if (!ok) {
-                    reply("Model lokalku belum termuat — cek path .litertlm di pengaturan 🥺", "sad")
-                } else {
-                    // PROMPT PENDEK: model kecil mudah overflow/crash dgn prompt panjang.
-                    // Tanpa paksa JSON (model kecil sering gagal format) — teks mentah jadi ucapan.
-                    val persona = ctx.soulMd.take(300)
-                    val prompt = "$persona\nJawab SINGKAT & ramah dalam bahasa Indonesia.\n" +
-                        "Pemilik: ${context.take(400)}\nKamu:"
-                    val raw = LocalBrain.generate(prompt)?.trim()
-                    if (raw.isNullOrBlank()) reply(fallbackSay, fallbackEmotion)
-                    else reply(raw.take(300), "neutral")
-                }
+                // prompt ringkas (model kecil mudah overflow); tanpa paksa JSON
+                val persona = ctx.soulMd.take(300)
+                val prompt = "$persona\nJawab SINGKAT & ramah dalam bahasa Indonesia.\n" +
+                    "Pemilik: ${context.take(400)}\nKamu:"
+                val raw = LocalBrain.generate(ctx, ctx.localModelPath, prompt)?.trim()
+                val parsed = if (raw.isNullOrBlank())
+                    reply("Aduh, AI lokalku gagal jalan 🥺 (model mungkin tak cocok — coba " +
+                        "model lain, atau matikan AI lokal untuk pakai cloud)", "sad")
+                else reply(raw.take(300), "neutral")
                 main.post { onReply(parsed) }
             }.start()
             return

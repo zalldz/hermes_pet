@@ -44,6 +44,9 @@ android {
     kotlinOptions {
         jvmTarget = "17"
     }
+    buildFeatures {
+        aidl = true // untuk ILlmService (proses :llm terisolasi)
+    }
 }
 
 dependencies {

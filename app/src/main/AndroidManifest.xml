@@ -91,6 +91,12 @@
             android:exported="false"
             android:foregroundServiceType="mediaProjection" />
 
+        <!-- AI lokal di proses TERPISAH: crash native model tak menjatuhkan pet -->
+        <service
+            android:name=".LlmService"
+            android:exported="false"
+            android:process=":llm" />
+
         <activity
             android:name=".MainActivity"
             android:exported="true">

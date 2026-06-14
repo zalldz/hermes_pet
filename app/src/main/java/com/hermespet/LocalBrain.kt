@@ -1,68 +1,75 @@
 package com.hermespet
 
+import android.content.ComponentName
 import android.content.Context
+import android.content.Intent
+import android.content.ServiceConnection
+import android.os.IBinder
+import android.os.RemoteException
 import android.util.Log
-import com.google.mediapipe.tasks.genai.llminference.LlmInference
-import com.google.mediapipe.tasks.genai.llminference.LlmInferenceSession
-import java.io.File
 
 /**
- * Otak AI LOKAL on-device via MediaPipe LLM Inference (LiteRT) — seperti Google
- * AI Edge Gallery. Memuat model **.litertlm** (atau .task) offline; cukup
- * arahkan path filenya. 100% di HP, tanpa internet.
+ * Klien AI lokal: bicara ke [LlmService] di proses ":llm" lewat AIDL.
+ * Kalau proses itu crash (model tak cocok), kita dapat RemoteException —
+ * dikembalikan null tanpa menjatuhkan pet (proses utama).
  */
 object LocalBrain {
     private const val TAG = "LocalBrain"
-    private var llm: LlmInference? = null
-    private var loadedPath: String? = null
+    @Volatile private var svc: ILlmService? = null
+    private val lock = Object()
+    // circuit breaker: hentikan sementara kalau model gagal beruntun (hemat baterai)
+    @Volatile private var failCount = 0
+    @Volatile private var blockedUntil = 0L
 
-    /** true bila model di path siap dipakai (memuat ulang bila path berubah). */
-    @Synchronized
-    fun ensureLoaded(ctx: Context, path: String): Boolean {
-        if (path.isBlank() || !File(path).exists()) return false
-        if (llm != null && loadedPath == path) return true
-        close()
-        return try {
-            val opts = LlmInference.LlmInferenceOptions.builder()
-                .setModelPath(path)
-                .setMaxTokens(2048) // ruang token cukup agar tak overflow → cegah native crash
-                .build()
-            llm = LlmInference.createFromOptions(ctx, opts)
-            loadedPath = path
-            true
-        } catch (e: Throwable) {
-            Log.w(TAG, "gagal muat model: ${e.message}")
-            llm = null; loadedPath = null
-            false
+    private val conn = object : ServiceConnection {
+        override fun onServiceConnected(name: ComponentName?, b: IBinder?) {
+            synchronized(lock) { svc = ILlmService.Stub.asInterface(b); lock.notifyAll() }
+        }
+        override fun onServiceDisconnected(name: ComponentName?) {
+            synchronized(lock) { svc = null } // proses :llm mati/di-recycle
+        }
+        override fun onBindingDied(name: ComponentName?) {
+            synchronized(lock) { svc = null }
         }
     }
 
-    /** Hasilkan teks dari prompt (blocking — panggil di thread latar). */
-    @Synchronized
-    fun generate(prompt: String): String? {
-        val engine = llm ?: return null
-        var session: LlmInferenceSession? = null
+    private fun ensureBound(ctx: Context): ILlmService? {
+        synchronized(lock) {
+            svc?.let { return it }
+            try {
+                ctx.applicationContext.bindService(
+                    Intent(ctx, LlmService::class.java), conn, Context.BIND_AUTO_CREATE)
+            } catch (e: Exception) {
+                Log.w(TAG, "bind gagal: ${e.message}"); return null
+            }
+            val deadline = System.currentTimeMillis() + 6_000
+            while (svc == null && System.currentTimeMillis() < deadline) {
+                try { lock.wait(500) } catch (e: InterruptedException) { break }
+            }
+            return svc
+        }
+    }
+
+    /** Hasilkan teks lewat proses terisolasi. null = gagal (pet tetap aman). */
+    fun generate(ctx: Context, modelPath: String, prompt: String): String? {
+        if (System.currentTimeMillis() < blockedUntil) return null // sedang istirahat
+        val s = ensureBound(ctx) ?: return fail()
         return try {
-            session = LlmInferenceSession.createFromOptions(
-                engine,
-                LlmInferenceSession.LlmInferenceSessionOptions.builder()
-                    .setTopK(40)
-                    .setTemperature(0.8f)
-                    .build()
-            )
-            session.addQueryChunk(prompt)
-            session.generateResponse()
-        } catch (e: Throwable) {
+            val r = s.generate(modelPath, prompt)
+            if (r.isNullOrBlank()) fail() else { failCount = 0; r }
+        } catch (e: RemoteException) {
+            // proses :llm crash saat inferensi → rebind di panggilan berikutnya
+            Log.w(TAG, "proses llm mati: ${e.message}")
+            synchronized(lock) { svc = null }
+            fail()
+        } catch (e: Exception) {
             Log.w(TAG, "generate gagal: ${e.message}")
-            null
-        } finally {
-            runCatching { session?.close() }
+            fail()
         }
     }
 
-    @Synchronized
-    fun close() {
-        runCatching { llm?.close() }
-        llm = null; loadedPath = null
+    private fun fail(): String? {
+        if (++failCount >= 3) { blockedUntil = System.currentTimeMillis() + 5 * 60_000L; failCount = 0 }
+        return null
     }
 }
