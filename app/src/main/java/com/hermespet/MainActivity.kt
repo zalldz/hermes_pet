@@ -3,7 +3,6 @@ package com.hermespet
 import android.Manifest
 import android.app.Activity
 import android.content.ComponentName
-import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
@@ -23,12 +22,8 @@ import com.hermespet.Prefs.apiBaseUrl
 import com.hermespet.Prefs.apiKey
 import com.hermespet.Prefs.apiModel
 import com.hermespet.Prefs.embModel
-import com.hermespet.Prefs.fbApiKey
-import com.hermespet.Prefs.fbAppId
-import com.hermespet.Prefs.fbDbUrl
-import com.hermespet.Prefs.fbProjectId
-import com.hermespet.Prefs.mociId
-import com.hermespet.Prefs.pttTarget
+import com.hermespet.Prefs.lanDisplayName
+import com.hermespet.Prefs.lanNick
 import com.hermespet.Prefs.visionModel
 import com.hermespet.Prefs.latitude
 import com.hermespet.Prefs.longitude
@@ -253,46 +248,27 @@ class MainActivity : Activity() {
                 .setMessage(log.take(4000)).setPositiveButton("Tutup", null).show()
         })
 
-        // --- walkie-talkie (push-to-talk via Firebase) ---
-        col.addView(section("4. 📡 Walkie-talkie"))
-        col.addView(TextView(this).apply {
-            text = "ID Moci-ku: $mociId"; textSize = 16f
-            setPadding(0, 4, 0, 4)
+        // --- walkie-talkie LAN (WiFi yang sama, tanpa server) ---
+        col.addView(section("4. 📡 Walkie-talkie (WiFi)"))
+        col.addView(TextView(this).apply { text = "Nama tampilanmu di walkie:" })
+        val nickInput = EditText(this).apply { setText(lanDisplayName()); hint = "mis. Adit" }
+        col.addView(nickInput)
+        col.addView(hint("Pasang aplikasi ini di 2 HP, sambungkan ke WiFi yang SAMA. Teman muncul otomatis — tanpa internet, tanpa server."))
+        col.addView(hint("Di kotak chat pet: 📡 = kirim teks ke teman, tahan 🎙️ = kirim suara, ➤ = ngobrol ke AI."))
+        col.addView(button("Simpan nama walkie") {
+            lanNick = nickInput.text.toString().trim()
+            nickInput.setText(lanDisplayName())
+            toastStatus("Nama disimpan — restart pet agar aktif")
         })
-        col.addView(hint("Bagikan ID ini ke teman supaya dia bisa kirim pesan suara ke kamu."))
-        col.addView(button("📋 Salin ID-ku") {
-            val cb = getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
-            cb.setPrimaryClip(android.content.ClipData.newPlainText("Moci ID", mociId))
-            toastStatus("ID disalin: $mociId")
-        })
-
-        col.addView(TextView(this).apply { text = "ID teman tujuan (push-to-talk):" })
-        val targetInput = EditText(this).apply { setText(pttTarget); hint = "mis. K7P2QX" }
-        col.addView(targetInput)
-        col.addView(hint("Tahan tombol 🎙️ di kotak chat untuk rekam → lepas = kirim ke ID ini."))
-
-        col.addView(TextView(this).apply {
-            text = "Firebase (isi 4 ini agar walkie aktif):"; setPadding(0, 8, 0, 2)
-        })
-        val fbKeyInput = EditText(this).apply { setText(fbApiKey); hint = "apiKey (AIza...)" }
-        col.addView(fbKeyInput)
-        val fbAppInput = EditText(this).apply { setText(fbAppId); hint = "appId (1:...:android:...)" }
-        col.addView(fbAppInput)
-        val fbProjInput = EditText(this).apply { setText(fbProjectId); hint = "projectId" }
-        col.addView(fbProjInput)
-        val fbUrlInput = EditText(this).apply { setText(fbDbUrl); hint = "databaseURL (https://...firebasedatabase.app)" }
-        col.addView(fbUrlInput)
-        col.addView(hint("Buat 1 proyek Firebase gratis → Realtime Database → salin 4 nilai ini. Kosong = walkie nonaktif."))
-
-        col.addView(button("Simpan walkie-talkie") {
-            pttTarget = targetInput.text.toString().trim()
-            fbApiKey = fbKeyInput.text.toString().trim()
-            fbAppId = fbAppInput.text.toString().trim()
-            fbProjectId = fbProjInput.text.toString().trim()
-            fbDbUrl = fbUrlInput.text.toString().trim()
-            // tampilkan target ter-normalisasi (huruf besar)
-            targetInput.setText(pttTarget)
-            toastStatus("Walkie-talkie disimpan — restart pet agar aktif")
+        col.addView(button("👥 Lihat teman terdeteksi") {
+            val list = LanLink.peerNames()
+            val msg = when {
+                !LanLink.isRunning() -> "Hidupkan pet dulu agar walkie aktif."
+                list.isEmpty() -> "Belum ada teman di WiFi ini.\nPastikan HP lain juga menyalakan pet di WiFi yang sama."
+                else -> "Teman online:\n• " + list.joinToString("\n• ")
+            }
+            android.app.AlertDialog.Builder(this).setTitle("📡 Teman di WiFi")
+                .setMessage(msg).setPositiveButton("Tutup", null).show()
         })
 
         // --- start/stop ---
