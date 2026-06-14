@@ -107,15 +107,15 @@ class MainActivity : Activity() {
         }
         col.addView(localSwitch)
         col.addView(TextView(this).apply {
-            text = "Path file model .task (mis. /sdcard/Download/gemma3-1b-it.task):"
+            text = "Path file model .litertlm (mis. /sdcard/Download/gemma-3n-E2B-it.litertlm):"
         })
         val localPathInput = EditText(this).apply {
             setText(localModelPath)
-            hint = "/sdcard/Download/model.task"
+            hint = "/sdcard/Download/model.litertlm"
         }
         col.addView(localPathInput)
         col.addView(TextView(this).apply {
-            text = "Unduh model .task (LiteRT) dari HuggingFace/Kaggle, taruh di HP, " +
+            text = "Unduh model .litertlm (LiteRT) dari HuggingFace/Kaggle, taruh di HP, " +
                 "lalu isi path-nya. Butuh izin 'Semua file'. Vision tetap pakai AI cloud."
             textSize = 11f
             setTextColor(0xFF888888.toInt())

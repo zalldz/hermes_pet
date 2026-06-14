@@ -3,12 +3,13 @@ package com.hermespet
 import android.content.Context
 import android.util.Log
 import com.google.mediapipe.tasks.genai.llminference.LlmInference
+import com.google.mediapipe.tasks.genai.llminference.LlmInferenceSession
 import java.io.File
 
 /**
  * Otak AI LOKAL on-device via MediaPipe LLM Inference (LiteRT) — seperti Google
- * AI Edge Gallery. Jalankan model .task offline; cukup arahkan path filenya.
- * 100% di HP, tanpa internet.
+ * AI Edge Gallery. Memuat model **.litertlm** (atau .task) offline; cukup
+ * arahkan path filenya. 100% di HP, tanpa internet.
  */
 object LocalBrain {
     private const val TAG = "LocalBrain"
@@ -24,7 +25,7 @@ object LocalBrain {
         return try {
             val opts = LlmInference.LlmInferenceOptions.builder()
                 .setModelPath(path)
-                .setMaxTokens(640)
+                .setMaxTokens(1024)
                 .build()
             llm = LlmInference.createFromOptions(ctx, opts)
             loadedPath = path
@@ -36,13 +37,27 @@ object LocalBrain {
         }
     }
 
-    /** Hasilkan teks dari prompt tunggal (blocking — panggil di thread latar). */
+    /** Hasilkan teks dari prompt (blocking — panggil di thread latar). */
     @Synchronized
-    fun generate(prompt: String): String? = try {
-        llm?.generateResponse(prompt)
-    } catch (e: Throwable) {
-        Log.w(TAG, "generate gagal: ${e.message}")
-        null
+    fun generate(prompt: String): String? {
+        val engine = llm ?: return null
+        var session: LlmInferenceSession? = null
+        return try {
+            session = LlmInferenceSession.createFromOptions(
+                engine,
+                LlmInferenceSession.LlmInferenceSessionOptions.builder()
+                    .setTopK(40)
+                    .setTemperature(0.8f)
+                    .build()
+            )
+            session.addQueryChunk(prompt)
+            session.generateResponse()
+        } catch (e: Throwable) {
+            Log.w(TAG, "generate gagal: ${e.message}")
+            null
+        } finally {
+            runCatching { session?.close() }
+        }
     }
 
     @Synchronized

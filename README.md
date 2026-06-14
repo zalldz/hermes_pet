@@ -38,17 +38,15 @@ key, Model).
 - Model: mis. `google/gemini-flash-1.5` (murah, cepat, bisa lihat gambar)
 - Untuk fitur "lihat layar", isi juga **Model vision** dengan model multimodal.
 
-**B. AI LOKAL di HP (tanpa internet, privat)**
-Ya, cukup unduh model **`.gguf`** lalu jalankan lewat aplikasi runtime lokal yang
-menyediakan **server OpenAI-compatible di `127.0.0.1`**, mis.:
-- **Llama.cpp (server)**, **LM Playground**, **MLCChat**, **SmolChat**, atau sejenis
-  yang punya opsi "OpenAI compatible server".
-1. Unduh model GGUF kecil yang muat di HP (mis. Qwen2.5-3B-Instruct Q4, Gemma-2-2B Q4,
-   Phi-3-mini Q4 — pilih ~2–4B parameter biar lancar).
-2. Jalankan server lokalnya (biasanya port `8080`).
-3. Di HermesPet, set Base URL ke `http://127.0.0.1:8080/v1`, Model = nama model lokalmu,
-   API key boleh diisi apa saja.
-> Catatan: model kecil lebih "polos" dari model cloud, tapi 100% offline & privat.
+**B. AI LOKAL di HP (tanpa internet, privat) — TERTANAM di aplikasi**
+Mesin MediaPipe LLM Inference (LiteRT) sudah ditanam di HermesPet, seperti Google AI
+Edge Gallery. Tidak perlu server terpisah — cukup arahkan ke file model.
+1. Unduh model **`.litertlm`** (LiteRT) dari HuggingFace (`litert-community`) atau
+   Kaggle/Google AI Edge — mis. **Gemma 3n E2B** atau model ~1–2B agar lancar.
+2. Taruh di HP (mis. `/sdcard/Download/gemma-3n-E2B-it.litertlm`).
+3. Di HermesPet → pengaturan Otak → nyalakan **🔒 Pakai AI LOKAL** → isi path-nya →
+   Simpan. Butuh izin **Semua file**.
+> Catatan: model kecil lebih "polos" dari cloud, tapi 100% offline & privat.
 > Vision lokal masih jarang — untuk "lihat gambar" tetap pakai model cloud multimodal.
 
 Tanpa API key pun pet tetap hidup dengan balasan bawaan (untuk coba-coba).
