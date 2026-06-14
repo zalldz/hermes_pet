@@ -21,13 +21,13 @@ class ReminderReceiver : BroadcastReceiver() {
         // notifikasi (selalu, walau pet mati)
         val nm = context.getSystemService(NotificationManager::class.java)
         nm.createNotificationChannel(
-            NotificationChannel("hermespet-reminder", "Pengingat HermesPet",
+            NotificationChannel("hermespet-reminder", "Pengingat Mocipet",
                 NotificationManager.IMPORTANCE_HIGH)
         )
         val pi = PendingIntent.getActivity(context, 0,
             Intent(context, MainActivity::class.java), PendingIntent.FLAG_IMMUTABLE)
         nm.notify(text.hashCode(), Notification.Builder(context, "hermespet-reminder")
-            .setContentTitle("⏰ HermesPet mengingatkan")
+            .setContentTitle("⏰ Mocipet mengingatkan")
             .setContentText(text)
             .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
             .setContentIntent(pi)

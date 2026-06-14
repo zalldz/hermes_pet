@@ -125,7 +125,7 @@ class ScreenCaptureService : Service() {
         nm.createNotificationChannel(
             NotificationChannel(ch, "Tangkap layar", NotificationManager.IMPORTANCE_LOW))
         val notif = Notification.Builder(this, ch)
-            .setContentTitle("HermesPet melihat layar…")
+            .setContentTitle("Mocipet melihat layar…")
             .setSmallIcon(android.R.drawable.ic_menu_camera)
             .build()
         if (Build.VERSION.SDK_INT >= 30) {

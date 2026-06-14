@@ -1,8 +1,8 @@
-# 🐾 HermesPet
+# 🐾 Mocipet — v1.0
 
-Pet virtual slime cerdas yang jalan-jalan sebagai **overlay di atas semua aplikasi**
-di Android. Bisa ngobrol, lihat layar, kontrol HP, dan punya perasaan — semua dalam
-**satu aplikasi Android**, tanpa Termux.
+**Moci** adalah pet virtual slime cerdas yang jalan-jalan sebagai **overlay di atas
+semua aplikasi** di Android. Bisa ngobrol (streaming), lihat layar, kontrol HP,
+multi-step, punya memori & perasaan — semua dalam **satu aplikasi Android** yang ramping.
 
 ## Fitur
 

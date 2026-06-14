@@ -44,7 +44,7 @@ object Actions {
             }
             "dnd" -> dnd(ctx, action.optBoolean("on", true))
             "set_alarm" -> setAlarm(ctx, action.optInt("hour", 7),
-                action.optInt("minute", 0), action.optString("label", "HermesPet"))
+                action.optInt("minute", 0), action.optString("label", "Mocipet"))
             "save_note" -> saveNote(ctx, action.optString("filename", "catatan.txt"),
                 action.optString("text"))
             "read_note" -> readNote(ctx, action.optString("filename", "catatan.txt"))
@@ -256,7 +256,7 @@ object Actions {
 
     private fun noteDir(): java.io.File = java.io.File(
         android.os.Environment.getExternalStoragePublicDirectory(
-            android.os.Environment.DIRECTORY_DOCUMENTS), "HermesPet")
+            android.os.Environment.DIRECTORY_DOCUMENTS), "Mocipet")
 
     private fun safeName(filename: String): String =
         filename.replace(Regex("[^A-Za-z0-9._ -]"), "_").ifBlank { "catatan.txt" }
@@ -266,7 +266,7 @@ object Actions {
         if (!storageOk(ctx)) return askStorage(ctx)
         val dir = noteDir().apply { mkdirs() }
         java.io.File(dir, safeName(filename)).appendText(text + "\n")
-        return "Kucatat di Documents/HermesPet/${safeName(filename)} 📝"
+        return "Kucatat di Documents/Mocipet/${safeName(filename)} 📝"
     }
 
     private fun readNote(ctx: Context, filename: String): String {

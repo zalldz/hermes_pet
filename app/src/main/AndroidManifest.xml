@@ -48,7 +48,7 @@
 
     <application
         android:name=".HermesApp"
-        android:label="HermesPet"
+        android:label="Mocipet"
         android:icon="@mipmap/ic_launcher"
         android:usesCleartextTraffic="true"
         android:theme="@android:style/Theme.Material.Light">
@@ -77,7 +77,7 @@
         <activity
             android:name=".ShareActivity"
             android:exported="true"
-            android:label="HermesPet 🐾"
+            android:label="Mocipet 🐾"
             android:theme="@android:style/Theme.Translucent.NoTitleBar">
             <intent-filter>
                 <action android:name="android.intent.action.SEND" />

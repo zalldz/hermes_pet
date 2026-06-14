@@ -94,7 +94,7 @@ object Brain {
             "\"hour\":0-23,\"minute\":0-59,\"text\":\"<isi pengingat>\"} " +
             "(pengingat terjadwal yang bunyi tepat waktu walau kamu idle) | " +
             "{\"type\":\"save_note\",\"filename\":\"<nama>.txt\",\"text\":\"<isi>\"} " +
-            "(catat ke Documents/HermesPet) | " +
+            "(catat ke Documents/Mocipet) | " +
             "{\"type\":\"read_note\",\"filename\":\"<nama>.txt\"} | " +
             "{\"type\":\"remember\",\"text\":\"<fakta penting>\",\"importance\":0.1-1.0} " +
             "(simpan ke memori jangka panjangmu) | " +

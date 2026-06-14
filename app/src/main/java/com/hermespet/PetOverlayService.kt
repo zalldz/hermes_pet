@@ -918,7 +918,7 @@ class PetOverlayService : Service() {
             this, 0, Intent(this, MainActivity::class.java), PendingIntent.FLAG_IMMUTABLE
         )
         val notif = Notification.Builder(this, channelId)
-            .setContentTitle("🐾 HermesPet")
+            .setContentTitle("🐾 Mocipet")
             .setSmallIcon(R.mipmap.ic_launcher)
             .setContentIntent(pi)
             .setOngoing(true)

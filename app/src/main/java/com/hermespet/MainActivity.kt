@@ -87,7 +87,7 @@ class MainActivity : Activity() {
         }
         setContentView(ScrollView(this).apply { addView(col) })
 
-        col.addView(TextView(this).apply { text = "🐾 HermesPet"; textSize = 24f })
+        col.addView(TextView(this).apply { text = "🐾 Mocipet"; textSize = 24f })
         status = TextView(this).apply { setPadding(0, pad / 2, 0, pad) }
         col.addView(status)
 

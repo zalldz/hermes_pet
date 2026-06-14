@@ -35,7 +35,7 @@ class WizardActivity : Activity() {
         }
         setContentView(ScrollView(this).apply { addView(col) })
 
-        col.addView(TextView(this).apply { text = "Selamat datang di HermesPet 🐾"; textSize = 24f })
+        col.addView(TextView(this).apply { text = "Selamat datang di Mocipet 🐾"; textSize = 24f })
         col.addView(TextView(this).apply {
             text = "Tiga langkah singkat biar pet-mu siap."
             setPadding(0, 8, 0, 16)

@@ -21,7 +21,7 @@ class ShareActivity : Activity() {
         super.onCreate(savedInstanceState)
         val pet = PetOverlayService.instance
         if (pet == null) {
-            Toast.makeText(this, "Hidupkan HermesPet dulu ya 🐾", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "Hidupkan Mocipet dulu ya 🐾", Toast.LENGTH_SHORT).show()
             finish(); return
         }
 
