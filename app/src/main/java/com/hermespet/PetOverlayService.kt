@@ -692,10 +692,31 @@ class PetOverlayService : Service() {
         }
     }
 
+    private var streamingText = ""
+
     private fun sendToBrain(type: String, data: JSONObject) {
         // interaksi langsung memperbarui "kapan terakhir disapa" (anti-kesepian)
         if (type == "chat" || type == "poke") { Mood.noteInteraction(this); Care.cheer(this) }
-        Brain.sendEvent(this, type, data) { reply -> applyReply(type, reply) }
+        // streaming hanya untuk chat (jawaban mengalir real-time)
+        val onStream: ((String) -> Unit)? = if (type == "chat") { s -> streamSay(s) } else null
+        Brain.sendEvent(this, type, data, onStream) { reply -> applyReply(type, reply) }
+    }
+
+    /** Tampilkan teks "say" yang masih mengalir (tanpa typewriter — streaming asli). */
+    private fun streamSay(partial: String) {
+        if (partial.isEmpty()) return
+        handler.removeCallbacks(typeRunnable)
+        streamingText = partial
+        if (!bubbleShown) {
+            runCatching { wm.addView(bubble, bubbleLp) }
+            bubbleShown = true
+            bubble.alpha = 1f; bubble.scaleX = 1f; bubble.scaleY = 1f
+        }
+        bubble.text = partial
+        positionBubble()
+        handler.removeCallbacks(hideBubble)
+        handler.postDelayed(hideBubble, 30_000)
+        pausedUntil = maxOf(pausedUntil, System.currentTimeMillis() + 8_000)
     }
 
     /** Terapkan balasan otak: emosi+mood, ucapan, dan aksi nyata. Dipakai chat & vision. */
@@ -711,8 +732,18 @@ class PetOverlayService : Service() {
         val text = reply.optString("say", "")
         if (text.isNotEmpty()) {
             PetLog.add(this, "pet", text)
-            say(text, null, typewriter = true)
+            // kalau teks sudah tampil lewat streaming → finalkan tanpa animasi ulang
+            say(text, null, typewriter = (text != streamingText))
             speak(text)
+        }
+        streamingText = ""
+        // memori pintar: simpan fakta penting yang dipelajari otak (otomatis)
+        reply.optJSONObject("remember")?.let { mem ->
+            val factText = mem.optString("text")
+            if (factText.isNotEmpty()) {
+                Memory.remember(this, factText, mem.optDouble("importance", 0.6))
+                PetLog.add(this, "aksi", "🧠 ingat: $factText")
+            }
         }
         // KEAMANAN: aksi nyata HANYA dijalankan dari perintah langsung pemilik
         // (chat/suara/lihat-layar). Notifikasi/tick/sapaan TIDAK boleh memicu aksi —

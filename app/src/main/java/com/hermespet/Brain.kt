@@ -62,6 +62,10 @@ object Brain {
             "Warna tubuhmu otomatis mengikuti emosi (hijau senang, biru sedih, " +
             "merah marah, pink sayang, ungu ngantuk) — pilih emotion yang jujur " +
             "mencerminkan perasaanmu & empati ke mood pemilik.\n" +
+            "MEMORI: kalau dari obrolan kamu belajar FAKTA penting & tahan lama tentang " +
+            "pemilik (nama, preferensi, rencana, orang/tempat penting), tambahkan field " +
+            "\"remember\":{\"text\":\"<fakta singkat>\",\"importance\":0.1-1.0} di JSON. " +
+            "Jangan mengingat hal sepele atau sementara.\n" +
             "Kamu juga bisa MELAKUKAN aksi di HP. Kalau (dan hanya kalau) pemilik " +
             "memintanya, tambahkan field \"action\" di JSON. Untuk tugas GABUNGAN " +
             "(mis. \"siapkan aku tidur\"), beri BEBERAPA aksi berurutan lewat " +
@@ -105,13 +109,17 @@ object Brain {
             "Catatan: WiFi/Bluetooth hanya bisa kamu bukakan panelnya (aturan Android), " +
             "jelaskan itu dengan santai kalau diminta toggle."
 
-    fun sendEvent(ctx: Context, type: String, data: JSONObject, onReply: (JSONObject?) -> Unit) {
+    fun sendEvent(
+        ctx: Context, type: String, data: JSONObject,
+        onStream: ((String) -> Unit)? = null,
+        onReply: (JSONObject?) -> Unit
+    ) {
         when (type) {
             "tick" -> handleTick(ctx, data, onReply)
             "notification" -> handleNotification(ctx, data, onReply)
             "mood" -> handleMood(ctx, data, onReply)
             "poke" -> handlePoke(ctx, onReply)
-            "chat" -> handleChat(ctx, data, onReply)
+            "chat" -> handleChat(ctx, data, onStream, onReply)
             "greet" -> handleGreet(ctx, data, onReply)
             else -> onReply(null)
         }
@@ -240,7 +248,10 @@ object Brain {
         })
     }
 
-    private fun handleChat(ctx: Context, data: JSONObject, onReply: (JSONObject?) -> Unit) {
+    private fun handleChat(
+        ctx: Context, data: JSONObject,
+        onStream: ((String) -> Unit)?, onReply: (JSONObject?) -> Unit
+    ) {
         val text = data.optString("text").take(500)
         val history = if (chatHistory.isEmpty()) "" else
             "Percakapan kalian sebelumnya:\n" + chatHistory.joinToString("\n") {
@@ -250,18 +261,19 @@ object Brain {
         Memory.recall(ctx, text, 3) { mems ->
             val memCtx = if (mems.isEmpty()) "" else
                 "Ingatan jangka panjangmu yang relevan:\n- " + mems.joinToString("\n- ") + "\n\n"
-            askHermes(ctx,
-                memCtx + history + "Pemilikmu berkata kepadamu: \"$text\". Jawab dengan " +
-                    "hangat dan membantu — untuk chat boleh menjawab panjang secukupnya, " +
-                    "jangan dipotong.",
-                "Aku dengar kamu! Tapi isi API key dulu di pengaturan biar aku bisa mikir 🥺",
-                "love") { reply ->
+            val prompt = memCtx + history + "Pemilikmu berkata kepadamu: \"$text\". Jawab dengan " +
+                "hangat dan membantu — untuk chat boleh menjawab panjang secukupnya, jangan dipotong."
+            val fb = "Aku dengar kamu! Tapi isi API key dulu di pengaturan biar aku bisa mikir 🥺"
+            val onDone: (JSONObject?) -> Unit = { reply ->
                 reply?.optString("say")?.takeIf { it.isNotEmpty() }?.let { said ->
                     chatHistory.addLast(text to said.take(300))
                     while (chatHistory.size > 6) chatHistory.removeFirst()
                 }
                 onReply(reply)
             }
+            if (onStream != null && ctx.apiKey.isNotBlank())
+                askHermesStream(ctx, prompt, fb, "love", onStream, onDone)
+            else askHermes(ctx, prompt, fb, "love", onDone)
         }
     }
 
@@ -337,6 +349,91 @@ object Brain {
         })
     }
 
+    /** Versi STREAMING (SSE): teks "say" mengalir lewat onStream; finalisasi di onReply. */
+    private fun askHermesStream(
+        ctx: Context, context: String,
+        fallbackSay: String, fallbackEmotion: String,
+        onStream: (String) -> Unit, onReply: (JSONObject?) -> Unit
+    ) {
+        val body = JSONObject()
+            .put("model", ctx.apiModel)
+            .put("max_tokens", 700)
+            .put("temperature", 0.8)
+            .put("stream", true)
+            .put("messages", JSONArray()
+                .put(JSONObject().put("role", "system").put("content", systemPrompt(ctx)))
+                .put(JSONObject().put("role", "user").put("content", context)))
+        val req = Request.Builder()
+            .url(ctx.apiBaseUrl.trimEnd('/') + "/chat/completions")
+            .header("Authorization", "Bearer ${ctx.apiKey}")
+            .post(body.toString().toRequestBody(jsonType))
+            .build()
+
+        http.newCall(req).enqueue(object : Callback {
+            override fun onFailure(call: Call, e: IOException) {
+                main.post { onReply(reply(fallbackSay, fallbackEmotion)) }
+            }
+
+            override fun onResponse(call: Call, response: Response) {
+                val full = StringBuilder()
+                var lastSay = ""
+                try {
+                    response.use { r ->
+                        val source = r.body?.source() ?: return@use
+                        while (!source.exhausted()) {
+                            val line = source.readUtf8Line() ?: break
+                            if (!line.startsWith("data:")) continue
+                            val data = line.substring(5).trim()
+                            if (data == "[DONE]") break
+                            val delta = try {
+                                JSONObject(data).optJSONArray("choices")?.optJSONObject(0)
+                                    ?.optJSONObject("delta")?.optString("content") ?: ""
+                            } catch (e: Exception) { "" }
+                            if (delta.isNotEmpty()) {
+                                full.append(delta)
+                                val say = extractPartialSay(full.toString())
+                                if (say != null && say != lastSay) {
+                                    lastSay = say
+                                    main.post { onStream(say) }
+                                }
+                            }
+                        }
+                    }
+                } catch (e: Exception) {
+                    Log.w(TAG, "stream gagal: ${e.message}")
+                }
+                val parsed = extractJson(full.toString())
+                    ?: if (lastSay.isNotEmpty()) reply(lastSay, "neutral")
+                    else reply(fallbackSay, fallbackEmotion)
+                main.post { onReply(parsed) }
+            }
+        })
+    }
+
+    /** Ekstrak nilai "say" (bisa parsial) dari JSON yang masih mengalir. */
+    private fun extractPartialSay(s: String): String? {
+        var i = s.indexOf("\"say\"")
+        if (i < 0) return null
+        i = s.indexOf(':', i)
+        if (i < 0) return null
+        i++
+        while (i < s.length && (s[i] == ' ' || s[i] == '\n' || s[i] == '\t')) i++
+        if (i >= s.length || s[i] != '"') return null
+        i++
+        val out = StringBuilder()
+        var j = i
+        while (j < s.length) {
+            val c = s[j]
+            if (c == '\\' && j + 1 < s.length) {
+                out.append(when (s[j + 1]) { 'n' -> '\n'; 't' -> '\t'; '"' -> '"'; '\\' -> '\\'; else -> s[j + 1] })
+                j += 2; continue
+            }
+            if (c == '"') break // tutup → say lengkap
+            out.append(c); j++
+        }
+        return out.toString()
+    }
+
     /** Ambil objek JSON pertama dari teks jawaban model. */
     private fun extractJson(text: String): JSONObject? {
         val start = text.indexOf('{')
@@ -348,6 +445,7 @@ object Brain {
             val r = reply(obj.optString("say").take(1500), obj.optString("emotion", "neutral"))
             obj.optJSONObject("action")?.let { r.put("action", it) }
             obj.optJSONArray("actions")?.let { r.put("actions", it) } // multi-step
+            obj.optJSONObject("remember")?.let { r.put("remember", it) } // auto-memori
             r
         } catch (e: Exception) { null }
     }
