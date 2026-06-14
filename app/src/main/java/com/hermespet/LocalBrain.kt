@@ -20,6 +20,7 @@ object LocalBrain {
     // circuit breaker: hentikan sementara kalau model gagal beruntun (hemat baterai)
     @Volatile private var failCount = 0
     @Volatile private var blockedUntil = 0L
+    @Volatile private var lastModelPath: String? = null
 
     private val conn = object : ServiceConnection {
         override fun onServiceConnected(name: ComponentName?, b: IBinder?) {
@@ -52,6 +53,10 @@ object LocalBrain {
 
     /** Hasilkan teks lewat proses terisolasi. null = gagal (pet tetap aman). */
     fun generate(ctx: Context, modelPath: String, prompt: String): String? {
+        // ganti model → reset circuit breaker, beri kesempatan model baru
+        if (modelPath != lastModelPath) {
+            lastModelPath = modelPath; failCount = 0; blockedUntil = 0L
+        }
         if (System.currentTimeMillis() < blockedUntil) return null // sedang istirahat
         val s = ensureBound(ctx) ?: return fail()
         return try {
@@ -69,7 +74,7 @@ object LocalBrain {
     }
 
     private fun fail(): String? {
-        if (++failCount >= 3) { blockedUntil = System.currentTimeMillis() + 5 * 60_000L; failCount = 0 }
+        if (++failCount >= 3) { blockedUntil = System.currentTimeMillis() + 2 * 60_000L; failCount = 0 }
         return null
     }
 }
