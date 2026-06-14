@@ -71,6 +71,40 @@ object Prefs {
         get() = sp(this).getBoolean("music_dance", true)
         set(v) = sp(this).edit().putBoolean("music_dance", v).apply()
 
+    // --- Walkie-talkie ([[Walkie]]) via Firebase Realtime Database ---
+    var Context.fbApiKey: String
+        get() = sp(this).getString("fb_api_key", "") ?: ""
+        set(v) = sp(this).edit().putString("fb_api_key", v).apply()
+
+    var Context.fbAppId: String
+        get() = sp(this).getString("fb_app_id", "") ?: ""
+        set(v) = sp(this).edit().putString("fb_app_id", v).apply()
+
+    var Context.fbProjectId: String
+        get() = sp(this).getString("fb_project_id", "") ?: ""
+        set(v) = sp(this).edit().putString("fb_project_id", v).apply()
+
+    var Context.fbDbUrl: String
+        get() = sp(this).getString("fb_db_url", "") ?: ""
+        set(v) = sp(this).edit().putString("fb_db_url", v).apply()
+
+    /** ID Moci unik (dibuat sekali) untuk dialamati teman. */
+    var Context.mociId: String
+        get() {
+            var id = sp(this).getString("moci_id", "") ?: ""
+            if (id.isBlank()) {
+                id = (1..6).map { "ABCDEFGHJKLMNPQRSTUVWXYZ23456789".random() }.joinToString("")
+                sp(this).edit().putString("moci_id", id).apply()
+            }
+            return id
+        }
+        set(v) = sp(this).edit().putString("moci_id", v).apply()
+
+    /** ID teman tujuan push-to-talk. */
+    var Context.pttTarget: String
+        get() = sp(this).getString("ptt_target", "") ?: ""
+        set(v) = sp(this).edit().putString("ptt_target", v.uppercase().trim()).apply()
+
     var Context.moodCheckEnabled: Boolean
         get() = sp(this).getBoolean("mood_enabled", false)
         set(v) = sp(this).edit().putBoolean("mood_enabled", v).apply()

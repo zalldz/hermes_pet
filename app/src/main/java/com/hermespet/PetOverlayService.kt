@@ -42,6 +42,7 @@ import com.hermespet.Prefs.petScale
 import com.hermespet.Prefs.petVoice
 import com.hermespet.Prefs.petX
 import com.hermespet.Prefs.petY
+import com.hermespet.Prefs.pttTarget
 import com.hermespet.Prefs.sendMoodImage
 import org.json.JSONObject
 import java.util.Calendar
@@ -106,9 +107,23 @@ class PetOverlayService : Service() {
         handler.postDelayed(moodLoop, 20_000) // cek pertama tak lama setelah start
         handler.post(moodTick)
         handler.postDelayed(musicLoop, 3_000)
+        startWalkie()
         pet.emotion = Mood.current(this)
         say("Halo! Aku hidup! 🐾", PetView.Emotion.HAPPY)
         transientUntil = System.currentTimeMillis() + 8_000
+    }
+
+    /** Dengarkan pesan walkie-talkie masuk (jika Firebase dikonfigurasi). */
+    private fun startWalkie() {
+        if (!Walkie.isConfigured(this)) return
+        Walkie.startListening(this) { from, bytes ->
+            handler.post {
+                say("🔊 Pesan suara dari $from", PetView.Emotion.SURPRISED)
+                transientUntil = System.currentTimeMillis() + 6_000
+                VoiceMsg.play(this, bytes)
+                PetLog.add(this, "aksi", "🎙️ terima pesan suara dari $from")
+            }
+        }
     }
 
     // --- hemat baterai + sapaan proaktif ---
@@ -150,6 +165,8 @@ class PetOverlayService : Service() {
         handler.removeCallbacksAndMessages(null)
         Senses.stop(this)
         stopVisualizer()
+        Walkie.stopListening()
+        VoiceMsg.stop()
         tts?.shutdown()
         runCatching { unregisterReceiver(screenReceiver) }
         closeChat()
@@ -312,6 +329,8 @@ class PetOverlayService : Service() {
         val feed = Button(this).apply { text = "🍬" } // kasih makan
         val eye = Button(this).apply { text = "👁" }  // lihat layar
         val send = Button(this).apply { text = "➤" }
+        val ptt = Button(this).apply { text = "🎙️" } // tahan = pesan suara walkie
+        val pttOn = Walkie.isConfigured(this)
         val row = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             background = GradientDrawable().apply {
@@ -325,6 +344,7 @@ class PetOverlayService : Service() {
                 LinearLayout.LayoutParams.WRAP_CONTENT))
             addView(feed)
             addView(eye)
+            if (pttOn) addView(ptt)
             addView(send)
         }
         val clp = WindowManager.LayoutParams(
@@ -358,6 +378,48 @@ class PetOverlayService : Service() {
             lookAtScreen(q)
         }
         feed.setOnClickListener { closeChat(); feedPet() }
+        if (pttOn) {
+            ptt.setOnTouchListener { v, ev ->
+                when (ev.action) {
+                    MotionEvent.ACTION_DOWN -> {
+                        val target = pttTarget
+                        if (target.isBlank()) {
+                            say("Isi dulu ID teman di Setelan 🥺", PetView.Emotion.SAD)
+                            transientUntil = System.currentTimeMillis() + 3_000
+                            return@setOnTouchListener true
+                        }
+                        if (VoiceMsg.startRecording(this)) {
+                            ptt.text = "🔴"
+                            say("🎙️ Merekam... lepas untuk kirim", PetView.Emotion.SURPRISED)
+                            transientUntil = System.currentTimeMillis() + 30_000
+                        } else {
+                            say("Mic tidak bisa dipakai 🥺", PetView.Emotion.SAD)
+                        }
+                        true
+                    }
+                    MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                        ptt.text = "🎙️"
+                        val bytes = VoiceMsg.stopRecording()
+                        val target = pttTarget
+                        if (bytes == null || target.isBlank()) {
+                            say("Rekaman terlalu singkat 🙈", null)
+                            transientUntil = System.currentTimeMillis() + 2_500
+                        } else {
+                            say("Mengirim ke $target... 📡", PetView.Emotion.HAPPY)
+                            Walkie.send(this, target, bytes) { ok, msg ->
+                                handler.post {
+                                    say(if (ok) "✅ $msg" else "❌ $msg",
+                                        if (ok) PetView.Emotion.HAPPY else PetView.Emotion.SAD)
+                                    transientUntil = System.currentTimeMillis() + 3_000
+                                }
+                            }
+                        }
+                        true
+                    }
+                    else -> false
+                }
+            }
+        }
 
         wm.addView(row, clp)
         chatView = row

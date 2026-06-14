@@ -11,8 +11,8 @@ android {
         applicationId = "com.hermespet"
         minSdk = 26
         targetSdk = 34
-        versionCode = 11
-        versionName = "1.1"
+        versionCode = 12
+        versionName = "1.2"
     }
 
     // kunci debug tetap (di-commit) supaya semua build CI bertanda tangan sama
@@ -58,6 +58,10 @@ dependencies {
 
     // Deteksi wajah on-device (senyum, mata terbuka) — tanpa kirim data keluar HP
     implementation("com.google.mlkit:face-detection:16.1.7")
+
+    // Walkie-talkie: Firebase Realtime Database (init runtime, tanpa google-services.json)
+    implementation(platform("com.google.firebase:firebase-bom:33.7.0"))
+    implementation("com.google.firebase:firebase-database")
 
     // unit test parser (tidak ikut ke APK)
     testImplementation("junit:junit:4.13.2")
