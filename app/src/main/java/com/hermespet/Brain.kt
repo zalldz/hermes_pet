@@ -8,7 +8,9 @@ import com.hermespet.Prefs.apiBaseUrl
 import com.hermespet.Prefs.apiKey
 import com.hermespet.Prefs.apiModel
 import com.hermespet.Prefs.latitude
+import com.hermespet.Prefs.localModelPath
 import com.hermespet.Prefs.longitude
+import com.hermespet.Prefs.useLocalAi
 import com.hermespet.Prefs.agentMd
 import com.hermespet.Prefs.soulMd
 import com.hermespet.Prefs.visionModel
@@ -293,6 +295,22 @@ object Brain {
         fallbackSay: String, fallbackEmotion: String,
         onReply: (JSONObject?) -> Unit
     ) {
+        // --- AI LOKAL on-device (MediaPipe .task) ---
+        if (ctx.useLocalAi && ctx.localModelPath.isNotBlank()) {
+            Thread {
+                val ok = LocalBrain.ensureLoaded(ctx, ctx.localModelPath)
+                val parsed = if (!ok) {
+                    reply("Model lokalku belum termuat — cek path .task di pengaturan 🥺", "sad")
+                } else {
+                    val prompt = systemPrompt(ctx) + "\n\nPemilik: " + context +
+                        "\nKamu (balas HANYA JSON sesuai format di atas):"
+                    LocalBrain.generate(prompt)?.let { extractJson(it) }
+                        ?: reply(fallbackSay, fallbackEmotion)
+                }
+                main.post { onReply(parsed) }
+            }.start()
+            return
+        }
         val key = ctx.apiKey
         if (key.isBlank()) {
             // tanpa API key pet tetap hidup dengan balasan bawaan

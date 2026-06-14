@@ -7,6 +7,16 @@ object Prefs {
     private fun sp(ctx: Context): SharedPreferences =
         ctx.getSharedPreferences("hermespet", Context.MODE_PRIVATE)
 
+    /** Pakai AI lokal on-device (MediaPipe .task) alih-alih API cloud. */
+    var Context.useLocalAi: Boolean
+        get() = sp(this).getBoolean("use_local_ai", false)
+        set(v) = sp(this).edit().putBoolean("use_local_ai", v).apply()
+
+    /** Path file model .task lokal (mis. /sdcard/Download/gemma3-1b.task). */
+    var Context.localModelPath: String
+        get() = sp(this).getString("local_model_path", "") ?: ""
+        set(v) = sp(this).edit().putString("local_model_path", v).apply()
+
     var Context.apiBaseUrl: String
         get() = sp(this).getString("api_base_url", "https://inference-api.nousresearch.com/v1")
             ?: "https://inference-api.nousresearch.com/v1"

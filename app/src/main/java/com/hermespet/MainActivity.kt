@@ -25,7 +25,9 @@ import com.hermespet.Prefs.apiModel
 import com.hermespet.Prefs.embModel
 import com.hermespet.Prefs.visionModel
 import com.hermespet.Prefs.latitude
+import com.hermespet.Prefs.localModelPath
 import com.hermespet.Prefs.longitude
+import com.hermespet.Prefs.useLocalAi
 import com.hermespet.Prefs.moodCheckEnabled
 import com.hermespet.Prefs.musicDance
 import com.hermespet.Prefs.petScale
@@ -96,6 +98,30 @@ class MainActivity : Activity() {
 
         // --- koneksi otak ---
         col.addView(section("2. Otak (AI)"))
+
+        @Suppress("UseSwitchCompatOrMaterialCode")
+        val localSwitch = Switch(this).apply {
+            text = "🔒 Pakai AI LOKAL di HP (offline, tanpa API)"
+            isChecked = useLocalAi
+            setOnCheckedChangeListener { _, on -> useLocalAi = on }
+        }
+        col.addView(localSwitch)
+        col.addView(TextView(this).apply {
+            text = "Path file model .task (mis. /sdcard/Download/gemma3-1b-it.task):"
+        })
+        val localPathInput = EditText(this).apply {
+            setText(localModelPath)
+            hint = "/sdcard/Download/model.task"
+        }
+        col.addView(localPathInput)
+        col.addView(TextView(this).apply {
+            text = "Unduh model .task (LiteRT) dari HuggingFace/Kaggle, taruh di HP, " +
+                "lalu isi path-nya. Butuh izin 'Semua file'. Vision tetap pakai AI cloud."
+            textSize = 11f
+            setTextColor(0xFF888888.toInt())
+        })
+
+        col.addView(TextView(this).apply { text = "— atau AI cloud —"; setPadding(0, 16, 0, 4) })
         col.addView(TextView(this).apply { text = "API key (OpenRouter / server lokal):" })
         val keyInput = EditText(this).apply {
             setText(apiKey); hint = "sk-... (kosong = balasan bawaan)"
@@ -173,6 +199,8 @@ class MainActivity : Activity() {
             visionModel = visionInput.text.toString().trim()
             latitude = latInput.text.toString().trim()
             longitude = lonInput.text.toString().trim()
+            useLocalAi = localSwitch.isChecked
+            localModelPath = localPathInput.text.toString().trim()
             soulMd = soulInput.text.toString()
             agentMd = agentInput.text.toString()
             toastStatus("Pengaturan otak disimpan")
