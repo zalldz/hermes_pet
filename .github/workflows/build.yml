@@ -8,6 +8,10 @@ on:
 permissions:
   contents: write # untuk membuat GitHub Release
 
+# Jalankan semua JS action di Node.js 24 (Node 20 di-deprecate GitHub per Jun 2026)
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   build:
     runs-on: ubuntu-latest
