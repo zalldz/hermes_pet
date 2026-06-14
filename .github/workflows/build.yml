@@ -5,6 +5,9 @@ on:
     branches: [main, master]
   workflow_dispatch:
 
+permissions:
+  contents: write # untuk membuat GitHub Release
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -36,3 +39,29 @@ jobs:
         with:
           name: mocipet-release-aab
           path: app/build/outputs/bundle/release/app-release.aab
+
+      # --- otomatis publish ke GitHub Releases (URL unduh langsung & stabil) ---
+      - name: Baca versionName
+        id: ver
+        run: |
+          V=$(grep -m1 versionName app/build.gradle.kts | sed -E 's/.*"([^"]+)".*/\1/')
+          echo "version=$V" >> "$GITHUB_OUTPUT"
+
+      - name: Siapkan berkas rilis (nama jelas berversi)
+        run: |
+          mkdir -p release
+          cp app/build/outputs/apk/debug/app-debug.apk "release/mocipet-v${{ steps.ver.outputs.version }}.apk"
+          cp app/build/outputs/bundle/release/app-release.aab "release/mocipet-v${{ steps.ver.outputs.version }}.aab"
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.ver.outputs.version }}
+          name: Mocipet v${{ steps.ver.outputs.version }}
+          body: |
+            Build otomatis dari commit ${{ github.sha }}.
+            - **mocipet-v${{ steps.ver.outputs.version }}.apk** — pasang langsung ke HP (sideload).
+            - **mocipet-v${{ steps.ver.outputs.version }}.aab** — untuk unggah ke Play Console.
+          files: release/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
