@@ -25,9 +25,7 @@ import com.hermespet.Prefs.apiModel
 import com.hermespet.Prefs.embModel
 import com.hermespet.Prefs.visionModel
 import com.hermespet.Prefs.latitude
-import com.hermespet.Prefs.localModelPath
 import com.hermespet.Prefs.longitude
-import com.hermespet.Prefs.aiMode
 import com.hermespet.Prefs.moodCheckEnabled
 import com.hermespet.Prefs.musicDance
 import com.hermespet.Prefs.petScale
@@ -97,43 +95,7 @@ class MainActivity : Activity() {
         col.addView(permPanel)
 
         // --- koneksi otak ---
-        col.addView(section("2. Otak (AI)"))
-
-        val modeLabel = TextView(this).apply {
-            text = "Mode: ${aiModeName(aiMode)}"; setPadding(0, 0, 0, 6)
-        }
-        val modeRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-        listOf("cloud" to "☁️ Cloud", "local" to "🔒 Lokal", "hybrid" to "⚡ Hybrid").forEach { (m, lbl) ->
-            modeRow.addView(button(lbl) {
-                aiMode = m; modeLabel.text = "Mode: ${aiModeName(m)}"
-                toastStatus("Mode AI: ${aiModeName(m)}")
-            })
-        }
-        col.addView(modeLabel)
-        col.addView(modeRow)
-        col.addView(TextView(this).apply {
-            text = "Cloud ☁️ = pintar (perlu API key). Lokal 🔒 = offline (perlu model .litertlm). " +
-                "Hybrid ⚡ = perintah HP ringan diproses lokal (offline), sisanya ke cloud. " +
-                "Titik di pet: hijau=lokal, biru=cloud."
-            textSize = 11f; setTextColor(0xFF888888.toInt())
-        })
-
-        col.addView(TextView(this).apply {
-            text = "Path file model .litertlm (untuk mode Lokal/Hybrid):"
-        })
-        val localPathInput = EditText(this).apply {
-            setText(localModelPath)
-            hint = "/sdcard/Download/model.litertlm"
-        }
-        col.addView(localPathInput)
-        col.addView(TextView(this).apply {
-            text = "Model ringan disarankan (mis. Gemma3-1B / functiongemma-270m). " +
-                "Butuh izin 'Semua file'. Vision tetap pakai cloud."
-            textSize = 11f
-            setTextColor(0xFF888888.toInt())
-        })
-
-        col.addView(TextView(this).apply { text = "— API cloud —"; setPadding(0, 16, 0, 4) })
+        col.addView(section("2. Otak (AI cloud)"))
         col.addView(TextView(this).apply { text = "API key (OpenRouter / server lokal):" })
         val keyInput = EditText(this).apply {
             setText(apiKey); hint = "sk-... (kosong = balasan bawaan)"
@@ -211,7 +173,6 @@ class MainActivity : Activity() {
             visionModel = visionInput.text.toString().trim()
             latitude = latInput.text.toString().trim()
             longitude = lonInput.text.toString().trim()
-            localModelPath = localPathInput.text.toString().trim()
             soulMd = soulInput.text.toString()
             agentMd = agentInput.text.toString()
             toastStatus("Pengaturan otak disimpan")
@@ -334,10 +295,6 @@ class MainActivity : Activity() {
     private fun toastStatus(msg: String) {
         android.widget.Toast.makeText(this, msg, android.widget.Toast.LENGTH_SHORT).show()
         refreshStatus()
-    }
-
-    private fun aiModeName(m: String) = when (m) {
-        "local" -> "🔒 Lokal (offline)"; "hybrid" -> "⚡ Hybrid"; else -> "☁️ Cloud"
     }
 
     private fun section(title: String): TextView = TextView(this).apply {

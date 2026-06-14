@@ -56,15 +56,18 @@ class PetView(context: Context) : View(context) {
         "................",
     )
 
-    // warna badan = SUMBER AI: lokal/offline = hijau, cloud (atau default) = biru.
-    // [body, light, shade, outline]
-    private fun palette(eng: String): IntArray = if (eng == "local")
-        intArrayOf(0xFF5BD68A.toInt(), 0xFFC5F5D8.toInt(), 0xFF2FA862.toInt(), 0xFF1C6B3E.toInt())
-    else
-        intArrayOf(0xFF4FC3F7.toInt(), 0xFFBEEBFF.toInt(), 0xFF2A9BD4.toInt(), 0xFF15577A.toInt())
+    // warna badan = SUASANA HATI (ekspresif): [body, light, shade, outline]
+    private fun palette(e: Emotion): IntArray = when (e) {
+        Emotion.HAPPY, Emotion.LOVE -> intArrayOf(0xFF6FE3A6.toInt(), 0xFFCFF7E2.toInt(), 0xFF3BBE7C.toInt(), 0xFF1E7A4E.toInt()) // hijau ceria
+        Emotion.SAD -> intArrayOf(0xFF6E86AE.toInt(), 0xFFAEC0DC.toInt(), 0xFF4A5E80.toInt(), 0xFF2A3852.toInt())   // biru kelam
+        Emotion.ANGRY -> intArrayOf(0xFFE8736B.toInt(), 0xFFF7B0AB.toInt(), 0xFFB5443E.toInt(), 0xFF6B2420.toInt()) // merah
+        Emotion.SLEEPY -> intArrayOf(0xFFA99BE0.toInt(), 0xFFD6CCF5.toInt(), 0xFF6F5FB0.toInt(), 0xFF3A2E66.toInt()) // ungu
+        Emotion.SURPRISED -> intArrayOf(0xFFF2D06B.toInt(), 0xFFFBEAB0.toInt(), 0xFFCBA13E.toInt(), 0xFF6E5A1E.toInt()) // kuning
+        else -> intArrayOf(0xFF4FC3F7.toInt(), 0xFFBEEBFF.toInt(), 0xFF2A9BD4.toInt(), 0xFF15577A.toInt())          // biru netral
+    }
 
     // warna saat ini (di-lerp menuju target tiap frame) → transisi mulus
-    private val cur = palette("").copyOf()
+    private val cur = palette(Emotion.NEUTRAL).copyOf()
 
     private fun crisp() = Paint()
     private val outline = crisp(); private val body = crisp()
@@ -88,9 +91,6 @@ class PetView(context: Context) : View(context) {
     /** Energi musik 0..1 → slime ikut bergoyang (di-set service dari Visualizer). */
     var beat = 0f
 
-    /** Sumber otak balasan terakhir: "local" (badan hijau) / "cloud" (badan biru). */
-    var engine: String = ""
-        set(v) { field = v; invalidate() }
 
     private val animator = object : Runnable {
         override fun run() {
@@ -145,8 +145,8 @@ class PetView(context: Context) : View(context) {
         offX = (w - cell * 16f) / 2f
         offY = (h - cell * 16f) / 2f
 
-        // transisi warna mulus menuju palette sumber AI (hijau lokal / biru cloud)
-        val target = palette(engine)
+        // transisi warna mulus menuju palette suasana hati
+        val target = palette(emotion)
         for (i in cur.indices) cur[i] = lerp(cur[i], target[i], 0.12f)
         body.color = cur[0]; light.color = cur[1]; shade.color = cur[2]; outline.color = cur[3]
 

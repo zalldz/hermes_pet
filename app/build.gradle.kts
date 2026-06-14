@@ -44,9 +44,6 @@ android {
     kotlinOptions {
         jvmTarget = "17"
     }
-    buildFeatures {
-        aidl = true // untuk ILlmService (proses :llm terisolasi)
-    }
 }
 
 dependencies {
@@ -61,7 +58,4 @@ dependencies {
 
     // Deteksi wajah on-device (senyum, mata terbuka) — tanpa kirim data keluar HP
     implementation("com.google.mlkit:face-detection:16.1.7")
-
-    // AI lokal on-device (MediaPipe LLM Inference / LiteRT) — jalankan model .litertlm/.task offline
-    implementation("com.google.mediapipe:tasks-genai:0.10.35")
 }
