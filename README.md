@@ -29,6 +29,14 @@ multi-step, punya memori & perasaan — semua dalam **satu aplikasi Android** ya
 - Aktifkan di wizard: **🖐 Aktifkan aksesibilitas**. Di Android 13+ (APK sideload) kalau
   tombolnya abu-abu: Info aplikasi → ⋮ → *Izinkan setelan terbatas*.
 
+**Fase 2 — Pill mode (dynamic island)**
+- Diam tanpa disentuh 30 detik → Moci menyusut jadi **pill kecil di atas-tengah layar**,
+  warnanya ikut mood & berdenyut pelan; jalan/fisika/animasi slime **berhenti** (hemat baterai).
+- **Ketuk pill** → mekar, slime jatuh memantul ke bawah, kembali jadi pet.
+- Notifikasi masuk saat mode pill → pill berkedip + **badge jumlah** (🔔 3), tanpa membuka.
+- Atur lama diamnya di Pengaturan → Pet (0 = tidak pernah jadi pill). Satu window yang
+  di-resize; di luar badan slime/pill sentuhan tembus ke aplikasi di bawahnya.
+
 ## Pasang & jalankan
 
 1. **Build APK** lewat GitHub Actions (tab Actions → unduh artifact `hermespet-debug-apk`),

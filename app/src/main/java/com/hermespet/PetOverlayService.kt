@@ -42,6 +42,7 @@ import com.hermespet.Prefs.petScale
 import com.hermespet.Prefs.petVoice
 import com.hermespet.Prefs.petX
 import com.hermespet.Prefs.petY
+import com.hermespet.Prefs.pillIdleSec
 import com.hermespet.Prefs.sendMoodImage
 import org.json.JSONObject
 import java.util.Calendar
@@ -84,6 +85,13 @@ class PetOverlayService : Service() {
     private var nextHopAt = 0L
     private val hopDurMs = 520L
 
+    // --- PILL mode (v2): "dynamic island" kecil di atas-tengah, hemat baterai ---
+    private lateinit var pill: TextView
+    private var pillMode = false
+    private var pillBadge = 0
+    private var pillPulse: android.animation.ObjectAnimator? = null
+    private var lastActivityAt = System.currentTimeMillis()
+
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onCreate() {
@@ -106,6 +114,7 @@ class PetOverlayService : Service() {
         handler.postDelayed(moodLoop, 20_000) // cek pertama tak lama setelah start
         handler.post(moodTick)
         handler.postDelayed(musicLoop, 3_000)
+        handler.postDelayed(pillLoop, 5_000)
         startLan()
         pet.emotion = Mood.current(this)
         say("Halo! Aku hidup! 🐾", PetView.Emotion.HAPPY)
@@ -142,7 +151,7 @@ class PetOverlayService : Service() {
             when (i?.action) {
                 Intent.ACTION_SCREEN_OFF -> { screenOn = false; pet.awake = false; stopVisualizer() }
                 Intent.ACTION_SCREEN_ON -> {
-                    screenOn = true; pet.awake = true
+                    screenOn = true; pet.awake = !pillMode
                     pet.emotion = Mood.current(this@PetOverlayService)
                 }
                 Intent.ACTION_USER_PRESENT -> maybeGreet() // buka kunci → sapa
@@ -193,6 +202,15 @@ class PetOverlayService : Service() {
             gravity = Gravity.CENTER_HORIZONTAL
             addView(pet)
         }
+        pill = TextView(this).apply {
+            gravity = Gravity.CENTER
+            setTextColor(Color.WHITE)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
+            background = GradientDrawable().apply { cornerRadius = dp(16f) }
+            visibility = View.GONE
+            contentDescription = "Moci (ketuk untuk membuka)"
+        }
+        root.addView(pill, LinearLayout.LayoutParams(dp(120f).toInt(), dp(32f).toInt()))
 
         lp = WindowManager.LayoutParams(
             WindowManager.LayoutParams.WRAP_CONTENT,
@@ -263,6 +281,11 @@ class PetOverlayService : Service() {
         var lastMoveX = 0f; var lastMoveY = 0f; var lastMoveT = 0L
 
         root.setOnTouchListener { _, ev ->
+            if (pillMode) { // pill: cukup ketuk untuk mekar jadi slime
+                if (ev.actionMasked == MotionEvent.ACTION_UP) expandFromPill()
+                return@setOnTouchListener true
+            }
+            lastActivityAt = System.currentTimeMillis()
             scaleDetector.onTouchEvent(ev)
             if (ev.pointerCount > 1) return@setOnTouchListener true
             when (ev.actionMasked) {
@@ -502,6 +525,76 @@ class PetOverlayService : Service() {
         pausedUntil = System.currentTimeMillis() + 60_000 // diam selama ngobrol
     }
 
+    // ---------------------------------------------------------------- pill mode
+
+    /** Cek idle tiap 5 detik: PET tanpa interaksi > pillIdleSec → menyusut jadi PILL. */
+    private val pillLoop = object : Runnable {
+        override fun run() {
+            val idleMs = pillIdleSec * 1000L
+            val now = System.currentTimeMillis()
+            if (pillMode) updatePill()
+            else if (idleMs > 0 && screenOn && chatView == null && !bubbleShown && !flinging &&
+                now - lastActivityAt > idleMs && now > pausedUntil) collapseToPill()
+            handler.postDelayed(this, 5_000)
+        }
+    }
+
+    private fun updatePill() {
+        (pill.background as GradientDrawable).setColor(pet.bodyColor())
+        pill.text = if (pillBadge > 0) "🔔 $pillBadge" else ""
+    }
+
+    private fun collapseToPill() {
+        if (pillMode) return
+        pillMode = true
+        closeChat()
+        pet.awake = false
+        stopVisualizer()
+        petX = lp.x; petY = lp.y
+        pet.visibility = View.GONE
+        pill.visibility = View.VISIBLE
+        updatePill()
+        val screenW = resources.displayMetrics.widthPixels
+        lp.x = (screenW - dp(120f).toInt()) / 2
+        lp.y = dp(6f).toInt()
+        runCatching { wm.updateViewLayout(root, lp) }
+        pill.scaleX = 0.3f
+        pill.animate().scaleX(1f).setDuration(220).start()
+        // denyut ringan (alpha) — satu animator, murah
+        pillPulse = android.animation.ObjectAnimator.ofFloat(pill, "alpha", 1f, 0.7f).apply {
+            duration = 1600
+            repeatMode = android.animation.ValueAnimator.REVERSE
+            repeatCount = android.animation.ValueAnimator.INFINITE
+            start()
+        }
+    }
+
+    /** Pill → mekar → slime jatuh dari pill (pakai fisika lempar yang sudah ada) → PET. */
+    private fun expandFromPill() {
+        if (!pillMode) return
+        pillMode = false
+        pillBadge = 0
+        pillPulse?.cancel(); pillPulse = null
+        lastActivityAt = System.currentTimeMillis()
+        pill.animate().scaleX(1.25f).scaleY(1.25f).setDuration(140).withEndAction {
+            pill.visibility = View.GONE
+            pill.scaleX = 1f; pill.scaleY = 1f; pill.alpha = 1f
+            pet.visibility = View.VISIBLE
+            pet.awake = screenOn
+            val size = (dp(BASE_SIZE_DP.toFloat()) * petScale).toInt()
+            lp.x = lp.x + dp(60f).toInt() - size / 2
+            runCatching { wm.updateViewLayout(root, lp) }
+            root.post { velX = 0f; velY = 0f; startFling() } // "slime drop"
+        }.start()
+    }
+
+    private fun flashPill() {
+        updatePill()
+        pill.animate().scaleX(1.18f).scaleY(1.18f).setDuration(120).withEndAction {
+            pill.animate().scaleX(1f).scaleY(1f).setDuration(160).start()
+        }.start()
+    }
+
     private fun closeChat() {
         chatView?.let { runCatching { wm.removeView(it) } }
         chatView = null
@@ -626,7 +719,7 @@ class PetOverlayService : Service() {
 
     private val walkLoop = object : Runnable {
         override fun run() {
-            if (!screenOn) { // layar mati → jangan render/gerak (hemat baterai)
+            if (!screenOn || pillMode) { // layar mati / pill → jangan render/gerak (hemat baterai)
                 handler.postDelayed(this, 1_000)
                 return
             }
@@ -745,7 +838,7 @@ class PetOverlayService : Service() {
     private val musicLoop = object : Runnable {
         override fun run() {
             val am = getSystemService(Context.AUDIO_SERVICE) as android.media.AudioManager
-            val want = musicDance && screenOn && am.isMusicActive
+            val want = musicDance && screenOn && !pillMode && am.isMusicActive
             if (want && visualizer == null) startVisualizer()
             else if (!want && visualizer != null) stopVisualizer()
             handler.postDelayed(this, 2_000)
@@ -782,6 +875,7 @@ class PetOverlayService : Service() {
 
     fun onNotificationSeen(pkg: String, title: String, text: String) {
         PetLog.add(this, "notif", "$pkg: $title — ${text.take(80)}")
+        if (pillMode) handler.post { pillBadge++; flashPill() }
         val data = JSONObject().put("package", pkg).put("title", title).put("text", text)
         sendToBrain("notification", data)
     }
@@ -879,6 +973,10 @@ class PetOverlayService : Service() {
             if (type == "chat" || type == "mood" || type == "vision") Mood.note(this, emo)
         }
         val text = reply.optString("say", "")
+        if (pillMode && type == "notification") { // pill: cukup badge + kedip, jangan mekar
+            if (text.isNotEmpty()) PetLog.add(this, "pet", text)
+            return
+        }
         if (text.isNotEmpty()) {
             PetLog.add(this, "pet", text)
             // kalau teks sudah tampil lewat streaming → finalkan tanpa animasi ulang
@@ -1050,6 +1148,8 @@ class PetOverlayService : Service() {
     }
 
     private fun say(text: String, emotion: PetView.Emotion?, typewriter: Boolean = false) {
+        if (pillMode) expandFromPill()
+        lastActivityAt = System.currentTimeMillis()
         emotion?.let { pet.emotion = it }
         handler.removeCallbacks(typeRunnable)
         val firstShow = !bubbleShown

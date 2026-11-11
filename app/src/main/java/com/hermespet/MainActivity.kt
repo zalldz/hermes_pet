@@ -30,6 +30,7 @@ import com.hermespet.Prefs.longitude
 import com.hermespet.Prefs.moodCheckEnabled
 import com.hermespet.Prefs.musicDance
 import com.hermespet.Prefs.petScale
+import com.hermespet.Prefs.pillIdleSec
 import com.hermespet.Prefs.petVoice
 import com.hermespet.Prefs.sendMoodImage
 import com.hermespet.Prefs.setupDone
@@ -189,6 +190,25 @@ class MainActivity : Activity() {
                         startService(Intent(this@MainActivity, PetOverlayService::class.java)
                             .setAction(PetOverlayService.ACTION_APPLY_SCALE))
                     }
+                }
+                override fun onStartTrackingTouch(sb: SeekBar?) {}
+                override fun onStopTrackingTouch(sb: SeekBar?) {}
+            })
+        })
+
+        val pillLabel = TextView(this)
+        fun pillText(v: Int) = "Jadi pill (dynamic island) setelah diam: " +
+            if (v == 0) "tidak pernah" else "$v detik"
+        pillLabel.text = pillText(pillIdleSec)
+        col.addView(pillLabel)
+        col.addView(SeekBar(this).apply {
+            max = 24 // ×5 detik → 0..120
+            progress = pillIdleSec / 5
+            setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+                override fun onProgressChanged(sb: SeekBar?, p: Int, fromUser: Boolean) {
+                    if (!fromUser) return
+                    pillIdleSec = p * 5
+                    pillLabel.text = pillText(p * 5)
                 }
                 override fun onStartTrackingTouch(sb: SeekBar?) {}
                 override fun onStopTrackingTouch(sb: SeekBar?) {}

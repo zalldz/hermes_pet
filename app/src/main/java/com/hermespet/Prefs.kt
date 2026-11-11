@@ -158,6 +158,11 @@ object Prefs {
         get() = sp(this).getLong("last_interaction", System.currentTimeMillis())
         set(v) = sp(this).edit().putLong("last_interaction", v).apply()
 
+    /** Detik tanpa interaksi sebelum pet menyusut jadi PILL (0 = tidak pernah). */
+    var Context.pillIdleSec: Int
+        get() = sp(this).getInt("pill_idle_sec", 30)
+        set(v) = sp(this).edit().putInt("pill_idle_sec", v.coerceIn(0, 600)).apply()
+
     var Context.petX: Int
         get() = sp(this).getInt("pet_x", 100)
         set(v) = sp(this).edit().putInt("pet_x", v).apply()
