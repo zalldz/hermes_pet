@@ -118,7 +118,17 @@ object Brain {
             "wifi_disconnect{ssid?} | battery_below{level} | battery_full | " +
             "geo_enter/geo_exit{lat,lon,radius meter} | app_open{app}; then: aksi apa pun, " +
             "atau {\"type\":\"notify\",\"text\":\"..\"} / {\"type\":\"brain\",\"text\":\"<perintah untukmu>\"}) | " +
-            "{\"type\":\"list_rules\"} | {\"type\":\"delete_rule\",\"name\":\"<nama>\"}\n" +
+            "{\"type\":\"list_rules\"} | {\"type\":\"delete_rule\",\"name\":\"<nama>\"} | " +
+            // --- v2: komunikasi & data ---
+            "{\"type\":\"call\",\"to\":\"<nama kontak/nomor>\"} | " +
+            "{\"type\":\"sms\",\"to\":\"<nama kontak/nomor>\",\"text\":\"<isi>\"} " +
+            "(telepon & SMS selalu dikonfirmasi pemilik) | {\"type\":\"read_sms\"} | " +
+            "{\"type\":\"find_phone\",\"seconds\":30} (bunyikan HP keras) | {\"type\":\"stop_ring\"} | " +
+            "{\"type\":\"clipboard_get\",\"n\":5} | {\"type\":\"clipboard_search\",\"query\":\"..\"} | " +
+            "{\"type\":\"clipboard_set\",\"text\":\"..\"} (salin teks) | " +
+            "{\"type\":\"search_file\",\"name\":\"<nama file>\"} | {\"type\":\"storage_report\"} | " +
+            "{\"type\":\"clear_cache_app\",\"app\":\"<nama aplikasi>\"} | " +
+            "{\"type\":\"backup_photos\"} (unggah foto baru ke homelab)\n" +
             "MENGENDALIKAN APLIKASI LAIN: rangkai aksi lalu AKHIRI dengan screen_read — kamu " +
             "akan dipanggil lagi dengan isi layar untuk langkah berikutnya (find_and_tap, " +
             "screen_type, ...). Ulangi sampai tugas beres (maks 8 putaran), lalu laporkan " +

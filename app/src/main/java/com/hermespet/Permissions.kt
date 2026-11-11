@@ -21,6 +21,11 @@ object Permissions {
 
     data class Perm(val label: String, val granted: Boolean, val essential: Boolean)
 
+    /** Izin baca foto/media (backup foto & cari file). */
+    // dideklarasikan sebelum `runtime` (urutan inisialisasi object)
+    val mediaPerm = if (Build.VERSION.SDK_INT >= 33) Manifest.permission.READ_MEDIA_IMAGES
+        else Manifest.permission.READ_EXTERNAL_STORAGE
+
     /** Izin runtime biasa yang bisa diminta lewat dialog sistem sekaligus. */
     private val runtime: List<String> = buildList {
         add(Manifest.permission.CAMERA)
@@ -30,6 +35,11 @@ object Permissions {
         add(Manifest.permission.READ_CALENDAR)
         if (Build.VERSION.SDK_INT >= 29) add(Manifest.permission.ACTIVITY_RECOGNITION)
         if (Build.VERSION.SDK_INT >= 33) add(Manifest.permission.POST_NOTIFICATIONS)
+        // v2 fase 4 (READ_SMS sengaja tidak: diminta saat "Baca SMS" dinyalakan)
+        add(Manifest.permission.READ_CONTACTS)
+        add(Manifest.permission.CALL_PHONE)
+        add(Manifest.permission.SEND_SMS)
+        add(mediaPerm)
     }
 
     fun has(ctx: Context, perm: String) =
@@ -97,6 +107,10 @@ object Permissions {
         Perm("Aktivitas (hitung langkah)",
             Build.VERSION.SDK_INT < 29 || has(ctx, Manifest.permission.ACTIVITY_RECOGNITION), false),
         Perm("Kalender (pengingat acara)", has(ctx, Manifest.permission.READ_CALENDAR), false),
+        Perm("Kontak & telepon (\"telepon Budi\")", has(ctx, Manifest.permission.READ_CONTACTS) &&
+            has(ctx, Manifest.permission.CALL_PHONE), false),
+        Perm("Kirim SMS (selalu dikonfirmasi)", has(ctx, Manifest.permission.SEND_SMS), false),
+        Perm("Foto & media (backup, cari file)", has(ctx, mediaPerm), false),
         Perm("Notifikasi aplikasi",
             Build.VERSION.SDK_INT < 33 || has(ctx, Manifest.permission.POST_NOTIFICATIONS), false),
         Perm("Ubah setelan sistem (kecerahan)", writeSettings(ctx), false),

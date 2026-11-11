@@ -163,6 +163,40 @@ object Prefs {
         get() = sp(this).getInt("pill_idle_sec", 30)
         set(v) = sp(this).edit().putInt("pill_idle_sec", v.coerceIn(0, 600)).apply()
 
+    // --- v2 fase 4: data & homelab ---
+    /** Izinkan Moci membaca SMS masuk (default MATI). */
+    var Context.smsReadEnabled: Boolean
+        get() = sp(this).getBoolean("sms_read", false)
+        set(v) = sp(this).edit().putBoolean("sms_read", v).apply()
+
+    /** Token rahasia untuk perintah dari homelab (find_phone). Kosong = perintah ditolak. */
+    var Context.homelabToken: String
+        get() = sp(this).getString("homelab_token", "") ?: ""
+        set(v) = sp(this).edit().putString("homelab_token", v.trim()).apply()
+
+    /** Folder WebDAV tujuan backup foto, mis. http://192.168.1.10:8080/dav/foto */
+    var Context.backupUrl: String
+        get() = sp(this).getString("backup_url", "") ?: ""
+        set(v) = sp(this).edit().putString("backup_url", v.trim()).apply()
+
+    var Context.backupUser: String
+        get() = sp(this).getString("backup_user", "") ?: ""
+        set(v) = sp(this).edit().putString("backup_user", v.trim()).apply()
+
+    var Context.backupPass: String
+        get() = sp(this).getString("backup_pass", "") ?: ""
+        set(v) = sp(this).edit().putString("backup_pass", v).apply()
+
+    /** Backup hanya jalan saat tersambung WiFi rumah ini. */
+    var Context.homeSsid: String
+        get() = sp(this).getString("home_ssid", "") ?: ""
+        set(v) = sp(this).edit().putString("home_ssid", v.trim()).apply()
+
+    /** DATE_ADDED (detik) foto terakhir yang sudah ter-backup. */
+    var Context.lastBackupSec: Long
+        get() = sp(this).getLong("last_backup_sec", 0L)
+        set(v) = sp(this).edit().putLong("last_backup_sec", v).apply()
+
     var Context.petX: Int
         get() = sp(this).getInt("pet_x", 100)
         set(v) = sp(this).edit().putInt("pet_x", v).apply()

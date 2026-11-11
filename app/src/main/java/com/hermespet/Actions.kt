@@ -68,6 +68,24 @@ object Actions {
             "add_rule" -> addRule(ctx, action)
             "delete_rule" -> Rules.delete(ctx, action.optString("name"))
             "list_rules" -> Rules.listText(ctx)
+            // --- v2 fase 4: komunikasi & data ---
+            "call" -> Comms.call(ctx, action.optString("to"))
+            "sms" -> Comms.sms(ctx, action.optString("to"), action.optString("text"))
+            "read_sms" -> Comms.readSms(ctx)
+            "find_phone" -> { Comms.ring(ctx, action.optInt("seconds", 30)); "Kubunyikan HP-ku 🔔" }
+            "stop_ring" -> { Comms.stopRing(); "Bunyi dimatikan 🔕" }
+            "clipboard_get" -> Clip.get(ctx, action.optInt("n", 5))
+            "clipboard_set" -> Clip.set(ctx, action.optString("text"))
+            "clipboard_search" -> Clip.search(ctx, action.optString("query"))
+            "search_file" -> FileOps.search(ctx, action.optString("name"))
+            "storage_report" -> FileOps.report(ctx)
+            "clear_cache_app" -> FileOps.openAppStorage(ctx, action.optString("app"))
+            "backup_photos" -> {
+                LanLink.backupPhotos(ctx) { n, err ->
+                    PetLog.add(ctx, "aksi", "📷 backup foto: $n terunggah" + (err?.let { " ($it)" } ?: ""))
+                }
+                "Backup foto ke homelab dimulai 📤"
+            }
             else -> null
         }
     } catch (e: Exception) {
@@ -75,7 +93,8 @@ object Actions {
     }
 
     /** Aksi yang hasilnya dikirim balik ke otak (loop agent), bukan sekadar diucapkan. */
-    val OBSERVE = setOf("screen_read", "usage_report", "list_rules")
+    val OBSERVE = setOf("screen_read", "usage_report", "list_rules", "read_sms", "clipboard_get",
+        "clipboard_search", "search_file", "storage_report")
 
     /** Aksi yang mengubah layar → beri jeda lebih lama sebelum langkah berikutnya. */
     val SLOW = setOf("open_app", "screen_tap", "find_and_tap", "press", "screen_scroll", "screen_type")
@@ -94,6 +113,11 @@ object Actions {
             ?.let { "Moci mau menekan \"$it\". Lanjut?" }
         "add_rule" -> "Moci mau memasang otomasi \"${action.optString("name")}\": kalau " +
             "${action.optJSONObject("trigger")} → ${action.optJSONObject("then")}. Lanjut?"
+        "call" -> PetOverlayService.instance?.let { Comms.confirmCall(it, action.optString("to")) }
+            ?: "Telepon ${action.optString("to")}?"
+        "sms" -> PetOverlayService.instance?.let {
+            Comms.confirmSms(it, action.optString("to"), action.optString("text"))
+        } ?: "Kirim SMS ke ${action.optString("to")}?"
         else -> null
     }
 

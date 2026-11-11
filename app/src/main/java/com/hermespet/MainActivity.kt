@@ -22,7 +22,13 @@ import com.hermespet.Prefs.apiBaseUrl
 import com.hermespet.Prefs.apiKey
 import com.hermespet.Prefs.apiModel
 import com.hermespet.Prefs.embModel
+import com.hermespet.Prefs.backupPass
+import com.hermespet.Prefs.backupUrl
+import com.hermespet.Prefs.backupUser
+import com.hermespet.Prefs.homeSsid
+import com.hermespet.Prefs.homelabToken
 import com.hermespet.Prefs.lanDisplayName
+import com.hermespet.Prefs.smsReadEnabled
 import com.hermespet.Prefs.lanNick
 import com.hermespet.Prefs.visionModel
 import com.hermespet.Prefs.latitude
@@ -289,6 +295,49 @@ class MainActivity : Activity() {
             }
             android.app.AlertDialog.Builder(this).setTitle("📡 Teman di WiFi")
                 .setMessage(msg).setPositiveButton("Tutup", null).show()
+        })
+
+        // --- v2 fase 4: data & homelab ---
+        col.addView(section("4b. 🏠 Data & homelab"))
+        @Suppress("UseSwitchCompatOrMaterialCode")
+        val smsSwitch = Switch(this).apply {
+            text = "Izinkan Moci membaca SMS masuk"
+            isChecked = smsReadEnabled
+            setOnCheckedChangeListener { _, on ->
+                smsReadEnabled = on
+                if (on && checkSelfPermission(android.Manifest.permission.READ_SMS) !=
+                    android.content.pm.PackageManager.PERMISSION_GRANTED)
+                    requestPermissions(arrayOf(android.Manifest.permission.READ_SMS), 101)
+            }
+        }
+        col.addView(smsSwitch)
+        col.addView(hint("Default mati. Kirim SMS & telepon selalu minta konfirmasimu dulu."))
+        fun field(label: String, value: String, h: String, secret: Boolean = false): EditText {
+            col.addView(TextView(this).apply { text = label })
+            return EditText(this).apply {
+                setText(value); hint = h; isSingleLine = true
+                if (secret) inputType = android.text.InputType.TYPE_CLASS_TEXT or
+                    android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD
+            }.also { col.addView(it) }
+        }
+        val urlInput = field("Folder WebDAV backup foto:", backupUrl, "http://192.168.1.10:8080/dav/foto")
+        val userInput = field("User WebDAV (opsional):", backupUser, "")
+        val passInput = field("Password WebDAV (opsional):", backupPass, "", secret = true)
+        val ssidInput = field("Nama WiFi rumah (backup otomatis saat tersambung):", homeSsid, "WiFi Rumah")
+        val tokenInput = field("Token perintah homelab (cari HP):", homelabToken, "rahasia panjang", secret = true)
+        col.addView(hint("Homelab kirim {\"cmd\":\"find_phone\",\"token\":\"…\"} ke port " +
+            "${LanLink.FIXED_PORT} → HP bunyi 30 detik & balas lokasi GPS. Token kosong = ditolak."))
+        col.addView(button("Simpan data & homelab") {
+            backupUrl = urlInput.text.toString(); backupUser = userInput.text.toString()
+            backupPass = passInput.text.toString(); homeSsid = ssidInput.text.toString()
+            homelabToken = tokenInput.text.toString()
+            toastStatus("Disimpan")
+        })
+        col.addView(button("📤 Backup foto sekarang") {
+            toastStatus("Backup berjalan…")
+            LanLink.backupPhotos(this) { n, err ->
+                runOnUiThread { toastStatus(err?.let { "Backup: $n terunggah, gagal: $it" } ?: "Backup selesai: $n foto") }
+            }
         })
 
         // --- start/stop ---

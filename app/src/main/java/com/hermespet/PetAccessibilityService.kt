@@ -31,7 +31,23 @@ class PetAccessibilityService : AccessibilityService() {
 
     override fun onInterrupt() {}
 
+    /** Teks yang terakhir diseleksi pengguna (untuk riwayat clipboard saat "Salin" ditekan). */
+    private var selected = ""
+
     override fun onAccessibilityEvent(e: AccessibilityEvent) {
+        if (e.eventType == AccessibilityEvent.TYPE_VIEW_TEXT_SELECTION_CHANGED) {
+            val t = e.text?.joinToString("")?.toString().orEmpty()
+            if (e.fromIndex in 0 until e.toIndex && e.toIndex <= t.length) selected = t.substring(e.fromIndex, e.toIndex)
+            return
+        }
+        if (e.eventType == AccessibilityEvent.TYPE_VIEW_CLICKED) {
+            val label = (e.text?.joinToString(" ") ?: "") + " " + (e.contentDescription ?: "")
+            if (selected.isNotEmpty() && Regex("(?i)\\b(copy|salin|cut|potong)\\b").containsMatchIn(label)) {
+                Clip.add(this, selected)
+                selected = ""
+            }
+            return
+        }
         if (e.eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
             val pkg = e.packageName?.toString() ?: return
             // abaikan diri sendiri, status bar & keyboard (bukan "aplikasi dibuka")

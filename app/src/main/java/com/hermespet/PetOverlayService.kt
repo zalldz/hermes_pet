@@ -34,6 +34,7 @@ import android.widget.Button
 import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.TextView
+import com.hermespet.Prefs.homeSsid
 import com.hermespet.Prefs.latitude
 import com.hermespet.Prefs.longitude
 import com.hermespet.Prefs.moodCheckEnabled
@@ -132,6 +133,11 @@ class PetOverlayService : Service() {
                         VoiceMsg.play(this, data)
                         PetLog.add(this, "aksi", "🎙️ suara dari $from (LAN)")
                     }
+                    LanLink.TYPE_CMD -> {
+                        val cmd = String(data, Charsets.UTF_8)
+                        if (cmd == "find_phone") say("🔔 Homelab mencari HP ini!", PetView.Emotion.SURPRISED)
+                        PetLog.add(this, "aksi", "🏠 perintah homelab: $cmd")
+                    }
                     LanLink.TYPE_TEXT -> {
                         val msg = String(data, Charsets.UTF_8)
                         say("💬 $from: $msg", PetView.Emotion.HAPPY)
@@ -183,6 +189,7 @@ class PetOverlayService : Service() {
         Senses.stop(this)
         stopVisualizer()
         LanLink.stop()
+        Comms.stopRing()
         VoiceMsg.stop()
         tts?.shutdown()
         runCatching { unregisterReceiver(screenReceiver) }
@@ -351,6 +358,8 @@ class PetOverlayService : Service() {
 
     private fun toggleChat() {
         if (chatView != null) { closeChat(); return }
+        // Android 10+ hanya mengizinkan baca clipboard saat window kita fokus
+        handler.postDelayed({ Clip.capture(this) }, 800)
         val input = EditText(this).apply {
             hint = "Ngobrol sama aku..."
             isSingleLine = true
@@ -551,6 +560,7 @@ class PetOverlayService : Service() {
     private fun checkRules(cur: Rules.State) {
         val prev = prevRuleState
         prevRuleState = cur
+        maybeBackup(prev, cur)
         val acts = Rules.evaluate(this, prev, cur)
         if (acts.isEmpty()) return
         val queue = ArrayList<JSONObject>()
@@ -561,6 +571,16 @@ class PetOverlayService : Service() {
         }
         PetLog.add(this, "aksi", "⚙️ otomasi: ${acts.joinToString { it.optString("type") }}")
         if (queue.isNotEmpty()) runActionQueue(queue, sayFeedback = true)
+    }
+
+    /** Baru tersambung ke WiFi rumah → backup foto baru ke homelab (kalau URL diisi). */
+    private fun maybeBackup(prev: Rules.State?, cur: Rules.State) {
+        val home = homeSsid
+        if (home.isEmpty() || cur.ssid == prev?.ssid || !home.equals(cur.ssid, ignoreCase = true)) return
+        LanLink.backupPhotos(this) { n, err ->
+            PetLog.add(this, "aksi", "📷 backup foto: $n terunggah" + (err?.let { " ($it)" } ?: ""))
+            if (n > 0) handler.post { say("📤 $n foto ter-backup ke homelab", PetView.Emotion.HAPPY) }
+        }
     }
 
     /** Dipanggil aksesibilitas saat aplikasi di depan berganti. */

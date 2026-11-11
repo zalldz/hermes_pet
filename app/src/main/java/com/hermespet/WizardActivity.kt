@@ -48,6 +48,8 @@ class WizardActivity : Activity() {
         col.addView(button("✨ Berikan semua izin sekaligus") { grantAll() })
         col.addView(hint("Pet butuh tampil di atas aplikasi & beberapa izin. Tombol ini " +
             "memandumu satu per satu."))
+        col.addView(hint("Termasuk kontak, telepon, SMS & foto: Moci SELALU minta konfirmasimu " +
+            "sebelum menelepon atau mengirim SMS. Boleh ditolak — fiturnya saja yang mati."))
         col.addView(button("🖐 Aktifkan aksesibilitas (Moci bisa tap & ketik)") {
             runCatching { startActivity(Permissions.accessibilityIntent()) }
             toast("Pilih \"Mocipet — tangan Moci\" lalu aktifkan")

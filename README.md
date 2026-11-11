@@ -50,6 +50,21 @@ multi-step, punya memori & perasaan — semua dalam **satu aplikasi Android** ya
   `adb shell pm grant com.hermespet android.permission.WRITE_SECURE_SETTINGS`
   (tanpa itu Moci membukakan setelannya). Trigger WiFi butuh izin lokasi aktif.
 
+**Fase 4 — Komunikasi & data**
+- **Telepon & SMS**: *"telepon Budi"*, *"SMS Ibu: aku pulang telat"* — nomor dicari dari
+  kontak; Moci **selalu minta konfirmasi** sebelum menelepon/mengirim. *"baca SMS terbaru"*
+  hanya kalau dinyalakan di Pengaturan → Data & homelab (default mati).
+- **Cari HP dari homelab**: kirim `{"cmd":"find_phone","token":"…"}` ke HP port `47474`
+  (frame LanLink tipe 3) → HP bunyi keras 30 detik & membalas koordinat GPS.
+  Contoh: `python3 scripts/find_phone.py <ip-hp> <token>`.
+- **Backup foto ke homelab**: isi folder WebDAV (+user/pass) & nama WiFi rumah → foto baru
+  diunggah otomatis saat tersambung WiFi rumah (maks 50 per putaran), atau *"backup foto"*.
+- **Clipboard manager**: riwayat 50 teks yang kamu salin (lewat aksesibilitas / saat chat
+  dibuka) — *"apa yang tadi kusalin?"*, *"cari clipboard berisi alamat"*, *"salin teks ini"*.
+- **File & penyimpanan**: *"cari file invoice"*, *"laporan penyimpanan"* (sisa ruang, foto/
+  video/audio, 5 app dengan cache terbesar), *"bersihkan cache Instagram"* (dibukakan
+  halaman app-nya — Android tidak mengizinkan app menghapus cache app lain).
+
 ## Pasang & jalankan
 
 1. **Build APK** lewat GitHub Actions (tab Actions → unduh artifact `hermespet-debug-apk`),

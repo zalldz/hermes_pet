@@ -20,6 +20,11 @@
 | PACKAGE_USAGE_STATS (v2) | Screen time per app & batas waktu app (akses khusus "Data penggunaan") | ya |
 | ACCESS_WIFI_STATE (v2) | Trigger otomasi saat sambung/putus WiFi tertentu (SSID; butuh izin lokasi) | – |
 | WRITE_SECURE_SETTINGS (v2, opsional) | Hemat baterai on/off oleh otomasi — hanya aktif kalau kamu beri lewat `adb pm grant` | sedang |
+| READ_CONTACTS (v2) | "Telepon/SMS Budi" — cari nomor dari nama kontak | ya |
+| CALL_PHONE (v2) | Menelepon langsung — **selalu dikonfirmasi**; tanpa izin ini hanya membuka dialer | ya |
+| SEND_SMS (v2) | Kirim SMS — **selalu dikonfirmasi** (dialog berisi nomor & isi); tanpa izin: buka app SMS | **sangat** |
+| READ_SMS (v2, opsional) | "Baca SMS terbaru" — default **mati**, diminta saat kamu menyalakannya di Pengaturan | **sangat** |
+| READ_MEDIA_IMAGES/VIDEO/AUDIO, READ_EXTERNAL_STORAGE ≤ Android 12 (v2) | Backup foto ke homelab, cari file, laporan penyimpanan | ya |
 | BIND_ACCESSIBILITY_SERVICE (v2) | Baca teks layar, tap, ketik, scroll, Back/Home di aplikasi lain — hanya atas perintahmu | **sangat** |
 
 Akses notifikasi & "Akses semua file" diaktifkan lewat layar setelan khusus
@@ -61,6 +66,20 @@ Akses notifikasi & "Akses semua file" diaktifkan lewat layar setelan khusus
 
 8. **Otomasi (v2)** — rule berjalan tanpa kamu sentuh, jadi **memasang rule lewat
    Moci selalu minta konfirmasi** (dialog). Rule bisa dilihat & dihapus di 🧠 Kelola.
+
+9. **Telepon & SMS (v2)** — `call`/`sms` **selalu** memunculkan dialog konfirmasi
+   (nama, nomor & isi pesan), juga saat dipicu otomasi; skill/makro tidak bisa
+   menjalankannya. Baca SMS default mati.
+
+10. **Perintah homelab (v2)** — HP menerima perintah LAN di port 47474 hanya kalau
+    token cocok (token kosong = semua ditolak). Perintah yang ada: `ping`,
+    `find_phone` (bunyi + kirim lokasi GPS ke peminta), `stop_ring`. Hanya WiFi lokal.
+
+11. **Backup foto (v2)** — foto baru diunggah HANYA ke folder WebDAV yang kamu isi,
+    dan otomatis hanya saat tersambung WiFi rumah. Kredensial disimpan lokal di HP.
+
+12. **Riwayat clipboard (v2)** — 50 teks terakhir disimpan **hanya di HP**
+    (`clipboard.json`); dikirim ke otak hanya saat kamu meminta.
 
 **Yang TIDAK dimiliki pet** (sengaja, demi keamanan): transaksi/pembayaran otomatis,
 hapus file pengguna, aksi berisiko tanpa konfirmasimu.
