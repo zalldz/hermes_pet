@@ -8,6 +8,7 @@ import android.media.AudioManager
 import android.os.Build
 import android.provider.Settings
 import android.view.KeyEvent
+import com.hermespet.Prefs.drivingMode
 import org.json.JSONObject
 
 /**
@@ -86,6 +87,13 @@ object Actions {
                 }
                 "Backup foto ke homelab dimulai 📤"
             }
+            // --- v2 fase 5: mode praktis ---
+            "driving_mode" -> {
+                ctx.drivingMode = action.optBoolean("on", true)
+                if (ctx.drivingMode) "Mode nyetir nyala 🚗 — chat masuk kubacakan" else "Mode nyetir mati"
+            }
+            "copy_screen" -> PetAccessibilityService.instance?.let { Clip.set(ctx, it.plainText()) }
+                ?: "Aktifkan dulu Aksesibilitas \"Mocipet\" ya 🙏"
             else -> null
         }
     } catch (e: Exception) {

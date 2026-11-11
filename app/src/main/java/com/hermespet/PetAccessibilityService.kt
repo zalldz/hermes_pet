@@ -88,6 +88,11 @@ class PetAccessibilityService : AccessibilityService() {
         return sb.toString().take(MAX_TEXT)
     }
 
+    /** Teks layar tanpa tag/koordinat (untuk disalin ke clipboard). */
+    fun plainText(): String = screenText().lines().drop(1)
+        .map { it.removePrefix("[isian] ").removePrefix("[tombol] ").replace(Regex(" @\\d+,\\d+$"), "") }
+        .filter { it.isNotBlank() }.joinToString("\n")
+
     private fun label(n: AccessibilityNodeInfo): String =
         n.text?.toString()?.trim().orEmpty().ifEmpty { n.contentDescription?.toString()?.trim().orEmpty() }
 

@@ -65,6 +65,17 @@ multi-step, punya memori & perasaan — semua dalam **satu aplikasi Android** ya
   video/audio, 5 app dengan cache terbesar), *"bersihkan cache Instagram"* (dibukakan
   halaman app-nya — Android tidak mengizinkan app menghapus cache app lain).
 
+**Fase 5 — Mode praktis**
+- **Mode nyetir** 🚗: chat masuk (WhatsApp, Telegram, LINE, Signal, Messenger, Instagram,
+  Discord, SMS) dibacakan TTS — antre, tidak saling potong, jalan walau suara pet mati.
+  Nyalakan di Pengaturan → Pet atau *"Moci, mode nyetir"*. Butuh akses Baca notifikasi.
+  Moci **tidak** membalas otomatis.
+- **Teks layar (OCR via aksesibilitas)**: *"salin semua teks di layar"* (`copy_screen`),
+  *"rangkum layar ini"*, *"terjemahkan layar ini ke Inggris"* — tanpa screenshot, langsung
+  dari teks yang terbaca aksesibilitas.
+- **Goyang untuk memanggil** 📳: goyang HP 2× → pill mekar & kotak chat terbuka. Bisa
+  dimatikan di Pengaturan → Pet.
+
 ## Pasang & jalankan
 
 1. **Build APK** lewat GitHub Actions (tab Actions → unduh artifact `hermespet-debug-apk`),

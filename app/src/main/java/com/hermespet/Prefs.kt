@@ -197,6 +197,17 @@ object Prefs {
         get() = sp(this).getLong("last_backup_sec", 0L)
         set(v) = sp(this).edit().putLong("last_backup_sec", v).apply()
 
+    // --- v2 fase 5: mode praktis ---
+    /** Mode nyetir: chat masuk dibacakan TTS (walau suara pet dimatikan). */
+    var Context.drivingMode: Boolean
+        get() = sp(this).getBoolean("driving_mode", false)
+        set(v) = sp(this).edit().putBoolean("driving_mode", v).apply()
+
+    /** Goyang HP → Moci muncul & buka chat. */
+    var Context.shakeSummon: Boolean
+        get() = sp(this).getBoolean("shake_summon", true)
+        set(v) = sp(this).edit().putBoolean("shake_summon", v).apply()
+
     var Context.petX: Int
         get() = sp(this).getInt("pet_x", 100)
         set(v) = sp(this).edit().putInt("pet_x", v).apply()

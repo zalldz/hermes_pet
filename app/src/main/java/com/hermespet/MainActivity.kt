@@ -25,7 +25,9 @@ import com.hermespet.Prefs.embModel
 import com.hermespet.Prefs.backupPass
 import com.hermespet.Prefs.backupUrl
 import com.hermespet.Prefs.backupUser
+import com.hermespet.Prefs.drivingMode
 import com.hermespet.Prefs.homeSsid
+import com.hermespet.Prefs.shakeSummon
 import com.hermespet.Prefs.homelabToken
 import com.hermespet.Prefs.lanDisplayName
 import com.hermespet.Prefs.smsReadEnabled
@@ -236,6 +238,23 @@ class MainActivity : Activity() {
             setOnCheckedChangeListener { _, on -> musicDance = on }
         }
         col.addView(danceSwitch)
+
+        @Suppress("UseSwitchCompatOrMaterialCode")
+        val driveSwitch = Switch(this).apply {
+            text = "🚗 Mode nyetir: bacakan chat masuk (WA, Telegram, SMS…)"
+            isChecked = drivingMode
+            setOnCheckedChangeListener { _, on -> drivingMode = on }
+        }
+        col.addView(driveSwitch)
+        col.addView(hint("Butuh akses Baca notifikasi. Bisa juga: \"Moci, mode nyetir\"."))
+
+        @Suppress("UseSwitchCompatOrMaterialCode")
+        val shakeSwitch = Switch(this).apply {
+            text = "📳 Goyang HP untuk memanggil Moci (buka chat)"
+            isChecked = shakeSummon
+            setOnCheckedChangeListener { _, on -> shakeSummon = on; toastStatus("Restart pet agar berlaku") }
+        }
+        col.addView(shakeSwitch)
 
         col.addView(TextView(this).apply {
             text = Care.status(this@MainActivity) + "  (kasih makan 🍬 lewat menu chat)"

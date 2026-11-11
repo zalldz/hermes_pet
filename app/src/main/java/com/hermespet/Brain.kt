@@ -128,7 +128,11 @@ object Brain {
             "{\"type\":\"clipboard_set\",\"text\":\"..\"} (salin teks) | " +
             "{\"type\":\"search_file\",\"name\":\"<nama file>\"} | {\"type\":\"storage_report\"} | " +
             "{\"type\":\"clear_cache_app\",\"app\":\"<nama aplikasi>\"} | " +
-            "{\"type\":\"backup_photos\"} (unggah foto baru ke homelab)\n" +
+            "{\"type\":\"backup_photos\"} (unggah foto baru ke homelab) | " +
+            // --- v2: mode praktis ---
+            "{\"type\":\"driving_mode\",\"on\":true/false} (bacakan chat masuk saat nyetir) | " +
+            "{\"type\":\"copy_screen\"} (salin semua teks layar ke clipboard). " +
+            "Untuk merangkum/menerjemahkan layar: screen_read lalu jawab dari hasilnya.\n" +
             "MENGENDALIKAN APLIKASI LAIN: rangkai aksi lalu AKHIRI dengan screen_read — kamu " +
             "akan dipanggil lagi dengan isi layar untuk langkah berikutnya (find_and_tap, " +
             "screen_type, ...). Ulangi sampai tugas beres (maks 8 putaran), lalu laporkan " +

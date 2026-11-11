@@ -34,8 +34,10 @@ import android.widget.Button
 import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.TextView
+import com.hermespet.Prefs.drivingMode
 import com.hermespet.Prefs.homeSsid
 import com.hermespet.Prefs.latitude
+import com.hermespet.Prefs.shakeSummon
 import com.hermespet.Prefs.longitude
 import com.hermespet.Prefs.moodCheckEnabled
 import com.hermespet.Prefs.musicDance
@@ -61,6 +63,11 @@ class PetOverlayService : Service() {
         private const val TICK_MS = 60_000L
         private const val MOOD_MS = 60 * 60_000L // tiap jam
         private const val WALK_FRAME_MS = 16L // ~60 fps
+        /** Aplikasi chat yang dibacakan saat mode nyetir. */
+        private val CHAT_APPS = listOf("com.whatsapp", "org.telegram", "org.thunderdog.challegram",
+            "jp.naver.line", "org.thoughtcrime.securesms", "com.facebook.orca",
+            "com.instagram.android", "com.google.android.apps.messaging", "com.discord",
+            "com.samsung.android.messaging", "com.android.mms")
     }
 
     private lateinit var wm: WindowManager
@@ -117,6 +124,7 @@ class PetOverlayService : Service() {
         handler.postDelayed(musicLoop, 3_000)
         handler.postDelayed(pillLoop, 5_000)
         startLan()
+        startShake()
         pet.emotion = Mood.current(this)
         say("Halo! Aku hidup! 🐾", PetView.Emotion.HAPPY)
         transientUntil = System.currentTimeMillis() + 8_000
@@ -190,6 +198,7 @@ class PetOverlayService : Service() {
         stopVisualizer()
         LanLink.stop()
         Comms.stopRing()
+        (getSystemService(SENSOR_SERVICE) as android.hardware.SensorManager).unregisterListener(shake)
         VoiceMsg.stop()
         tts?.shutdown()
         runCatching { unregisterReceiver(screenReceiver) }
@@ -743,6 +752,39 @@ class PetOverlayService : Service() {
 
     private var tts: TextToSpeech? = null
 
+    // ---------------------------------------------------------------- goyang untuk memanggil (v2)
+
+    private var shakeAt = 0L
+    private var shakeCount = 0
+    private val shake = object : android.hardware.SensorEventListener {
+        override fun onSensorChanged(e: android.hardware.SensorEvent) {
+            val g = Math.sqrt((e.values[0] * e.values[0] + e.values[1] * e.values[1] +
+                e.values[2] * e.values[2]).toDouble()) / android.hardware.SensorManager.GRAVITY_EARTH
+            if (g < 2.5) return
+            val now = System.currentTimeMillis()
+            // dua hentakan dalam 0,8 detik = goyang (cegah salah picu saat jalan)
+            shakeCount = if (now - shakeAt < 800) shakeCount + 1 else 1
+            shakeAt = now
+            if (shakeCount >= 2 && screenOn) { shakeCount = -10; handler.post { onShake() } }
+        }
+        override fun onAccuracyChanged(s: android.hardware.Sensor?, a: Int) {}
+    }
+
+    private fun startShake() {
+        if (!shakeSummon) return
+        val sm = getSystemService(SENSOR_SERVICE) as android.hardware.SensorManager
+        sm.getDefaultSensor(android.hardware.Sensor.TYPE_ACCELEROMETER)?.let {
+            sm.registerListener(shake, it, android.hardware.SensorManager.SENSOR_DELAY_UI)
+        }
+    }
+
+    private fun onShake() {
+        lastActivityAt = System.currentTimeMillis()
+        if (pillMode) expandFromPill()
+        if (chatView == null) toggleChat()
+        PetLog.add(this, "aksi", "📳 dipanggil lewat goyang")
+    }
+
     private fun speak(text: String) {
         if (!petVoice) return
         // buang emoji/simbol supaya TTS tidak membacakannya
@@ -996,6 +1038,11 @@ class PetOverlayService : Service() {
 
     fun onNotificationSeen(pkg: String, title: String, text: String) {
         PetLog.add(this, "notif", "$pkg: $title — ${text.take(80)}")
+        if (drivingMode && CHAT_APPS.any { pkg.startsWith(it) }) {
+            // mode nyetir: bacakan walau suara pet dimatikan; antre supaya tidak saling potong
+            val clean = "Pesan dari $title. $text".filter { it.code < 0x2190 }.take(300)
+            tts?.speak(clean, TextToSpeech.QUEUE_ADD, null, "drive-${System.nanoTime()}")
+        }
         if (pillMode) handler.post { pillBadge++; flashPill() }
         val data = JSONObject().put("package", pkg).put("title", title).put("text", text)
         sendToBrain("notification", data)
