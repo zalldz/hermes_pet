@@ -17,6 +17,8 @@ class NotifListener : NotificationListenerService() {
         val title = extras.getCharSequence("android.title")?.toString() ?: ""
         val text = extras.getCharSequence("android.text")?.toString() ?: ""
         if (title.isEmpty() && text.isEmpty()) return
+        // notif app keuangan & OTP tidak disimpan/diteruskan sama sekali
+        if (Guard.isMoneyApp(sbn.packageName) || Guard.isSensitiveText("$title $text")) return
 
         PetOverlayService.instance?.onNotificationSeen(sbn.packageName, title, text)
     }

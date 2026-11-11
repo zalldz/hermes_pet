@@ -23,7 +23,7 @@ object Clip {
 
     fun add(ctx: Context, text: String?) {
         val t = text?.trim()?.take(2000)
-        if (t.isNullOrEmpty()) return
+        if (t.isNullOrEmpty() || Guard.isSensitiveText(t)) return // OTP/bank tidak disimpan
         val h = listOf(t) + history(ctx).filter { it != t }
         file(ctx).writeText(JSONArray(h.take(MAX)).toString())
     }

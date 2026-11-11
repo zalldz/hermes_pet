@@ -45,7 +45,7 @@ object Usage {
             runCatching { ctx.startActivity(settingsIntent().addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
             return "Beri aku akses \"Data penggunaan\" dulu (kubukakan halamannya) 🙏"
         }
-        val m = todayMinutes(ctx).entries.sortedByDescending { it.value }
+        val m = todayMinutes(ctx).entries.filter { !Guard.isMoneyApp(it.key) }.sortedByDescending { it.value }
         if (m.isEmpty()) return "Belum ada pemakaian tercatat hari ini"
         val total = m.sumOf { it.value }
         val limits = limits(ctx)

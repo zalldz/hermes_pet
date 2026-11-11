@@ -24,6 +24,9 @@ jobs:
         with:
           gradle-version: "8.7"
 
+      - name: Unit test (Guard bank/daftar putih, parser)
+        run: gradle testDebugUnitTest
+
       - name: Build debug APK (untuk sideload/uji)
         run: gradle assembleDebug
 

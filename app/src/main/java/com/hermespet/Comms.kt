@@ -90,8 +90,12 @@ object Comms {
             arrayOf("address", "body", "date"), null, null, "date DESC")?.use { c ->
             val fmt = java.text.SimpleDateFormat("dd/MM HH:mm", java.util.Locale.getDefault())
             var n = 0
-            while (c.moveToNext() && n++ < 10) sb.append("- ${fmt.format(java.util.Date(c.getLong(2)))} " +
-                "${c.getString(0)}: ${c.getString(1).take(160)}\n")
+            while (c.moveToNext() && n < 10) {
+                val body = c.getString(1).orEmpty()
+                if (Guard.isSensitiveText(body)) continue // OTP/bank tidak pernah dibaca
+                n++
+                sb.append("- ${fmt.format(java.util.Date(c.getLong(2)))} ${c.getString(0)}: ${body.take(160)}\n")
+            }
         }
         return sb.toString().ifBlank { "Kotak masuk SMS kosong" }
     }

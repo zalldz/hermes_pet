@@ -35,12 +35,15 @@ class PetAccessibilityService : AccessibilityService() {
     private var selected = ""
 
     override fun onAccessibilityEvent(e: AccessibilityEvent) {
-        if (e.eventType == AccessibilityEvent.TYPE_VIEW_TEXT_SELECTION_CHANGED) {
+        // app keuangan: jangan simpan teks apa pun; cukup catat paketnya (batas waktu, focus)
+        val money = Guard.isMoneyApp(e.packageName?.toString())
+        if (money) selected = ""
+        if (!money && e.eventType == AccessibilityEvent.TYPE_VIEW_TEXT_SELECTION_CHANGED) {
             val t = e.text?.joinToString("")?.toString().orEmpty()
             if (e.fromIndex in 0 until e.toIndex && e.toIndex <= t.length) selected = t.substring(e.fromIndex, e.toIndex)
             return
         }
-        if (e.eventType == AccessibilityEvent.TYPE_VIEW_CLICKED) {
+        if (!money && e.eventType == AccessibilityEvent.TYPE_VIEW_CLICKED) {
             val label = (e.text?.joinToString(" ") ?: "") + " " + (e.contentDescription ?: "")
             if (selected.isNotEmpty() && Regex("(?i)\\b(copy|salin|cut|potong)\\b").containsMatchIn(label)) {
                 Clip.add(this, selected)
@@ -61,7 +64,19 @@ class PetAccessibilityService : AccessibilityService() {
     }
 
     /** Semua teks yang terlihat di layar aktif. Tombol/isian diberi tag + titik tengah (x,y). */
-    fun screenText(): String {
+    fun screenText(): String = guard() ?: dump()
+
+    /**
+     * Pagar SEMUA aksi layar: app aktif harus di daftar putih & bukan app keuangan, dan isinya
+     * bukan internet banking/OTP (browser). Null = boleh.
+     */
+    private fun guard(): String? {
+        val root = rootInActiveWindow ?: return "(layar tidak terbaca)"
+        Guard.screenBlock(root.packageName?.toString())?.let { return it }
+        return if (Guard.isSensitiveText(dump())) Guard.MONEY_MSG else null
+    }
+
+    private fun dump(): String {
         val root = rootInActiveWindow ?: return "(layar tidak terbaca)"
         val sb = StringBuilder("App: ${root.packageName}\n")
         fun walk(n: AccessibilityNodeInfo?, depth: Int) {
@@ -89,7 +104,7 @@ class PetAccessibilityService : AccessibilityService() {
     }
 
     /** Teks layar tanpa tag/koordinat (untuk disalin ke clipboard). */
-    fun plainText(): String = screenText().lines().drop(1)
+    fun plainText(): String = guard() ?: dump().lines().drop(1)
         .map { it.removePrefix("[isian] ").removePrefix("[tombol] ").replace(Regex(" @\\d+,\\d+$"), "") }
         .filter { it.isNotBlank() }.joinToString("\n")
 
@@ -105,6 +120,7 @@ class PetAccessibilityService : AccessibilityService() {
 
     /** Label elemen terdalam di titik (x,y) — untuk cek apakah tap itu tombol berisiko. */
     fun labelAt(x: Int, y: Int): String {
+        if (guard() != null) return ""
         var best = ""
         fun walk(n: AccessibilityNodeInfo?) {
             n ?: return
@@ -118,6 +134,7 @@ class PetAccessibilityService : AccessibilityService() {
     }
 
     fun findAndTap(q: String): String {
+        guard()?.let { return it }
         if (q.isBlank()) return "Tap yang mana? 🤔"
         val n = findNode(q) ?: return "Tidak ketemu \"$q\" di layar 🔍"
         var c: AccessibilityNodeInfo? = n
@@ -128,12 +145,14 @@ class PetAccessibilityService : AccessibilityService() {
     }
 
     fun tap(x: Int, y: Int): String {
+        guard()?.let { return it }
         val path = Path().apply { moveTo(x.toFloat(), y.toFloat()) }
         return if (gesture(path, 60)) "Kutap ($x,$y) 👆" else "Gagal tap 😖"
     }
 
     /** Ketik ke kolom yang sedang fokus (atau kolom isian pertama di layar). */
     fun type(text: String): String {
+        guard()?.let { return it }
         val root = rootInActiveWindow ?: return "Layar tidak terbaca 😖"
         val target = root.findFocus(AccessibilityNodeInfo.FOCUS_INPUT)?.takeIf { it.isEditable }
             ?: firstEditable(root) ?: return "Tidak ada kolom isian di layar 🤔"
@@ -160,6 +179,7 @@ class PetAccessibilityService : AccessibilityService() {
     }
 
     fun scroll(down: Boolean): String {
+        guard()?.let { return it }
         val act = if (down) AccessibilityNodeInfo.ACTION_SCROLL_FORWARD
             else AccessibilityNodeInfo.ACTION_SCROLL_BACKWARD
         if (firstScrollable(rootInActiveWindow)?.performAction(act) == true)
@@ -176,6 +196,8 @@ class PetAccessibilityService : AccessibilityService() {
     }
 
     fun press(key: String): String {
+        // tombol sistem (back/home) boleh di app mana pun untuk navigasi, kecuali app keuangan
+        if (Guard.isMoneyApp(rootInActiveWindow?.packageName?.toString())) return Guard.MONEY_MSG
         val a = when (key.lowercase().trim()) {
             "back", "kembali" -> GLOBAL_ACTION_BACK
             "home", "beranda" -> GLOBAL_ACTION_HOME

@@ -48,6 +48,8 @@ class ScreenCaptureService : Service() {
         val mpm = getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
         val projection = mpm.getMediaProjection(code, data)
         if (projection == null) { finish(null, question); return }
+        // jangan pernah memotret app keuangan
+        if (Guard.isMoneyApp(Usage.foreground(this))) { projection.stop(); finish(null, question); return }
 
         val metrics = DisplayMetrics()
         @Suppress("DEPRECATION")

@@ -254,7 +254,7 @@ object Actions {
             ?: launchables.firstOrNull { lbl(it).startsWith(q) }
             ?: launchables.firstOrNull { lbl(it).contains(q) }
             ?: launchables.firstOrNull { it.activityInfo.packageName.lowercase().contains(q) })
-            ?.activityInfo?.packageName
+            ?.activityInfo?.packageName?.takeIf { !Guard.isMoneyApp(it) }
     }
 
     private fun openApp(ctx: Context, name: String): String {
@@ -271,6 +271,7 @@ object Actions {
             ?: launchables.firstOrNull { lbl(it).replace(" ", "").contains(q.replace(" ", "")) }
             ?: launchables.firstOrNull { it.activityInfo.packageName.lowercase().contains(q) }
             ?: return "Aku nggak nemu aplikasi \"$name\" 😞"
+        if (Guard.isMoneyApp(match.activityInfo.packageName)) return Guard.MONEY_MSG
         val label = match.loadLabel(pm)
         pm.getLaunchIntentForPackage(match.activityInfo.packageName)?.let {
             it.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
@@ -282,6 +283,7 @@ object Actions {
 
     private fun openUrl(ctx: Context, url: String): String {
         if (url.isBlank()) return "URL-nya mana? 🤔"
+        if (Guard.isSensitiveText(url)) return Guard.MONEY_MSG
         val full = if (url.startsWith("http")) url else "https://$url"
         ctx.startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse(full))
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
