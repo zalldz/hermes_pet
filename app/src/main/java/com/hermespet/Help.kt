@@ -13,7 +13,6 @@ object Help {
             ✋  Seret      → pindahkan pet
             🤾  Lempar     → lempar, dia memantul
             🤏  Cubit      → ubah ukuran
-            🍬  (di chat)  → kasih makan
             👁  (di chat)  → suruh dia lihat layar
 
             Pet juga berganti WARNA sesuai perasaannya:

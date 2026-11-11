@@ -49,7 +49,7 @@ class LogActivity : Activity() {
         val fmt = SimpleDateFormat("dd/MM HH:mm", Locale.getDefault())
         val icon = mapOf(
             "user" to "🧑", "pet" to "🐾", "aksi" to "⚙️",
-            "notif" to "🔔", "mood" to "📷"
+            "notif" to "🔔"
         )
         PetLog.read(this).asReversed()
             .filter { !chatOnly || it.kind == "user" || it.kind == "pet" }

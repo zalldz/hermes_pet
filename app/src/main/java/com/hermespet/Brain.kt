@@ -160,7 +160,6 @@ object Brain {
         when (type) {
             "tick" -> handleTick(ctx, data, onReply)
             "notification" -> handleNotification(ctx, data, onReply)
-            "mood" -> handleMood(ctx, data, onReply)
             "poke" -> handlePoke(ctx, onReply)
             "chat" -> handleChat(ctx, data, onStream, onReply)
             "greet" -> handleGreet(ctx, data, onReply)
@@ -197,8 +196,6 @@ object Brain {
                 val desc = w.first; val temp = w.second
                 val emo = if ("hujan" in desc || "badai" in desc) "sad" else "happy"
                 val extra = buildString {
-                    if (data.has("light_lux")) append(" Cahaya sekitar pemilik: ${data.optInt("light_lux")} lux.")
-                    if (data.has("steps_since_pet_on")) append(" Langkah sejak pet menyala: ${data.optInt("steps_since_pet_on")}.")
                     append(" Jam sekarang: ${data.optInt("hour")}.")
                 }
                 askHermes(ctx,
@@ -222,25 +219,6 @@ object Brain {
             "Pemilikmu dapat notifikasi dari aplikasi $pkg: '$title: $text'. " +
                 "Komentari singkat dan relevan, ingatkan kalau kelihatan penting.",
             "Psst, ada pesan: $title 👀", "surprised", onReply = onReply)
-    }
-
-    private fun handleMood(ctx: Context, data: JSONObject, onReply: (JSONObject?) -> Unit) {
-        if (!data.optBoolean("face_detected")) {
-            onReply(reply("Loh, kamu di mana? 👀", "surprised"))
-            return
-        }
-        val guess = data.optString("mood_guess", "neutral")
-        val smile = data.optDouble("smile", -1.0)
-        val fallback = when (guess) {
-            "happy" -> "Senyummu cerah banget hari ini! 😄" to "love"
-            "sleepy" -> "Matamu sayu... istirahat dulu yuk 😴" to "sleepy"
-            "flat" -> "Kamu kelihatan lelah... aku temenin ya 🥺" to "sad"
-            else -> "Semangat terus ya hari ini!" to "happy"
-        }
-        askHermes(ctx,
-            "Kamu baru melihat wajah pemilikmu lewat kamera depan. Tebakan mood: $guess " +
-                "(probabilitas senyum ${"%.2f".format(smile)}). Beri komentar empatik singkat.",
-            fallback.first, fallback.second, onReply = onReply)
     }
 
     /** Memori percakapan: 6 tukar-kata terakhir disertakan sebagai konteks. */

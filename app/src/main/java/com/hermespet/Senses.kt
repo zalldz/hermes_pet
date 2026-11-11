@@ -4,12 +4,7 @@ import android.Manifest
 import android.content.ContentUris
 import android.content.Context
 import android.content.pm.PackageManager
-import android.hardware.Sensor
-import android.hardware.SensorEvent
-import android.hardware.SensorEventListener
-import android.hardware.SensorManager
 import android.location.LocationManager
-import android.os.Build
 import android.provider.CalendarContract
 import com.hermespet.Prefs.latitude
 import com.hermespet.Prefs.longitude
@@ -17,51 +12,13 @@ import org.json.JSONObject
 import java.util.Locale
 
 /**
- * Indra pet: sensor cahaya, penghitung langkah, lokasi terakhir (membuat
- * cuaca otomatis mengikuti posisi pemilik), dan acara kalender berikutnya.
- * Semua dibaca lokal di HP, lalu disertakan dalam event "tick" untuk otak.
+ * Indra pet: lokasi terakhir (membuat cuaca otomatis mengikuti posisi pemilik)
+ * dan acara kalender berikutnya. Dibaca lokal di HP, disertakan dalam event "tick".
  */
-object Senses : SensorEventListener {
-
-    private var lux = -1f
-    private var stepsAtStart = -1f
-    private var stepsNow = -1f
-
-    fun start(ctx: Context) {
-        val sm = ctx.getSystemService(Context.SENSOR_SERVICE) as SensorManager
-        sm.getDefaultSensor(Sensor.TYPE_LIGHT)?.let {
-            sm.registerListener(this, it, SensorManager.SENSOR_DELAY_NORMAL)
-        }
-        val stepsAllowed = Build.VERSION.SDK_INT < 29 || has(ctx, Manifest.permission.ACTIVITY_RECOGNITION)
-        if (stepsAllowed) {
-            sm.getDefaultSensor(Sensor.TYPE_STEP_COUNTER)?.let {
-                sm.registerListener(this, it, SensorManager.SENSOR_DELAY_NORMAL)
-            }
-        }
-    }
-
-    fun stop(ctx: Context) {
-        (ctx.getSystemService(Context.SENSOR_SERVICE) as SensorManager).unregisterListener(this)
-    }
-
-    override fun onSensorChanged(e: SensorEvent) {
-        when (e.sensor.type) {
-            Sensor.TYPE_LIGHT -> lux = e.values[0]
-            Sensor.TYPE_STEP_COUNTER -> {
-                stepsNow = e.values[0]
-                if (stepsAtStart < 0) stepsAtStart = stepsNow
-            }
-        }
-    }
-
-    override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
+object Senses {
 
     fun snapshot(ctx: Context): JSONObject {
         val o = JSONObject()
-        if (lux >= 0) o.put("light_lux", lux.toInt())
-        if (stepsNow >= 0 && stepsAtStart >= 0) {
-            o.put("steps_since_pet_on", (stepsNow - stepsAtStart).toInt())
-        }
         readLocation(ctx, o)
         readNextEvent(ctx, o)
         return o

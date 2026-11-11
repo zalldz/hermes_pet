@@ -53,19 +53,6 @@ object Prefs {
         get() = sp(this).getBoolean("pet_voice", true)
         set(v) = sp(this).edit().putBoolean("pet_voice", v).apply()
 
-    // --- rawat ala Tamagotchi ([[Care]]) ---
-    var Context.hunger: Float
-        get() = sp(this).getFloat("hunger", 75f)
-        set(v) = sp(this).edit().putFloat("hunger", v.coerceIn(0f, 100f)).apply()
-
-    var Context.happiness: Float
-        get() = sp(this).getFloat("happiness", 75f)
-        set(v) = sp(this).edit().putFloat("happiness", v.coerceIn(0f, 100f)).apply()
-
-    var Context.lastCareUpdate: Long
-        get() = sp(this).getLong("last_care", System.currentTimeMillis())
-        set(v) = sp(this).edit().putLong("last_care", v).apply()
-
     /** Slime ikut bergoyang saat ada musik. */
     var Context.musicDance: Boolean
         get() = sp(this).getBoolean("music_dance", true)
@@ -91,15 +78,6 @@ object Prefs {
 
     /** Nama efektif yang dipakai & dikirim ke teman. */
     fun Context.lanDisplayName(): String = lanNick.ifBlank { "Moci-$mociId" }
-
-    var Context.moodCheckEnabled: Boolean
-        get() = sp(this).getBoolean("mood_enabled", false)
-        set(v) = sp(this).edit().putBoolean("mood_enabled", v).apply()
-
-    /** Kirim foto mood ke agent (selain ringkasan ML Kit). */
-    var Context.sendMoodImage: Boolean
-        get() = sp(this).getBoolean("send_mood_image", false)
-        set(v) = sp(this).edit().putBoolean("send_mood_image", v).apply()
 
     /** Kepribadian pet (SOUL.md) — jadi system prompt otak. Bisa diedit pengguna. */
     const val DEFAULT_SOUL =
@@ -158,11 +136,6 @@ object Prefs {
         get() = sp(this).getLong("last_interaction", System.currentTimeMillis())
         set(v) = sp(this).edit().putLong("last_interaction", v).apply()
 
-    /** Detik tanpa interaksi sebelum pet menyusut jadi PILL (0 = tidak pernah). */
-    var Context.pillIdleSec: Int
-        get() = sp(this).getInt("pill_idle_sec", 30)
-        set(v) = sp(this).edit().putInt("pill_idle_sec", v.coerceIn(0, 600)).apply()
-
     // --- v2 fase 4: data & homelab ---
     /** Izinkan Moci membaca SMS masuk (default MATI). */
     var Context.smsReadEnabled: Boolean
@@ -202,11 +175,6 @@ object Prefs {
     var Context.drivingMode: Boolean
         get() = sp(this).getBoolean("driving_mode", false)
         set(v) = sp(this).edit().putBoolean("driving_mode", v).apply()
-
-    /** Goyang HP → Moci muncul & buka chat. */
-    var Context.shakeSummon: Boolean
-        get() = sp(this).getBoolean("shake_summon", true)
-        set(v) = sp(this).edit().putBoolean("shake_summon", v).apply()
 
     var Context.petX: Int
         get() = sp(this).getInt("pet_x", 100)

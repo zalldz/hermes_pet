@@ -15,7 +15,7 @@ saat pet menjawab.
 - **API key, model, & pengaturan** — disimpan di penyimpanan privat aplikasi.
 - **Memori & catatan** — fakta yang kamu bagikan ke pet, disimpan lokal.
 - **Riwayat chat & log** — lokal, bisa kamu hapus kapan saja.
-- **Izin opsional** (kamera, mikrofon, lokasi, notifikasi, kalender, langkah) — hanya
+- **Izin opsional** (mikrofon, lokasi, notifikasi, kalender) — hanya
   dipakai saat fiturnya kamu aktifkan/minta; tidak dikirim ke kami.
 
 ## Data yang dikirim ke penyedia AI pilihanmu

@@ -8,7 +8,7 @@ import java.util.Calendar
 
 /**
  * Suasana hati pet yang MENETAP (bukan cuma per-balasan). Dipengaruhi interaksi
- * & hasil cek mood kamera, meluruh ke netral seiring waktu, dan punya perilaku
+ * & balasan otak, meluruh ke netral seiring waktu, dan punya perilaku
  * kontekstual: ngantuk saat tengah malam, sedih/kesepian kalau lama diabaikan.
  * Warna tubuh pet otomatis mengikuti emosi ini (lihat PetView.palette).
  */

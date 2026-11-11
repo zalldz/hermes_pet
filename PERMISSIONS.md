@@ -4,12 +4,10 @@
 |---|---|---|
 | INTERNET | Memanggil model AI (otak) & ambil cuaca | – |
 | SYSTEM_ALERT_WINDOW | Menampilkan pet overlay di atas aplikasi lain | ya |
-| FOREGROUND_SERVICE (+DATA_SYNC/CAMERA/MICROPHONE/MEDIA_PROJECTION/LOCATION) | Menjaga pet tetap hidup di latar | – |
+| FOREGROUND_SERVICE (+DATA_SYNC/MICROPHONE/MEDIA_PROJECTION/LOCATION) | Menjaga pet tetap hidup di latar | – |
 | POST_NOTIFICATIONS | Notifikasi "pet aktif" & pengingat | – |
-| CAMERA | Cek mood lewat kamera depan (opsional, default mati) | ya |
 | RECORD_AUDIO | Perintah suara (double-tap) & deteksi musik (joget) | ya |
 | ACCESS_COARSE/FINE_LOCATION | "Cek lokasi/GPS" & cuaca otomatis ikut posisi | ya |
-| ACTIVITY_RECOGNITION | Menghitung langkah harian | sedang |
 | READ_CALENDAR | Mengingatkan acara terdekat | sedang |
 | WRITE_SETTINGS | Mengatur kecerahan layar | sedang |
 | MANAGE_EXTERNAL_STORAGE | Menulis/membaca catatan di `Documents/HermesPet` | ya |
@@ -43,8 +41,7 @@ Akses notifikasi & "Akses semua file" diaktifkan lewat layar setelan khusus
 2. **Data dikirim ke model AI (eksternal).**
    Isi notifikasi, foto layar (saat kamu share/👁), lokasi, dan obrolan dikirim ke
    endpoint AI yang kamu set. **Saran:** gunakan endpoint tepercaya. Kalau pakai API
-   pihak ketiga, sadari data ini keluar HP — matikan "cek mood kamera" & batasi
-   share kalau ragu.
+   pihak ketiga, sadari data ini keluar HP — batasi share kalau ragu.
 
 3. **Akses semua file** dibatasi di kode hanya ke folder `Documents/HermesPet`
    (catatan). Otak tidak bisa menyuruh baca/hapus file sembarangan.
@@ -52,8 +49,9 @@ Akses notifikasi & "Akses semua file" diaktifkan lewat layar setelan khusus
 4. **WhatsApp/pesan** hanya **disiapkan** (teks siap kirim) — pet tidak pernah
    menekan "kirim" sendiri. Tidak ada aksi transaksi/uang.
 
-5. **Kamera & mikrofon** hanya menyala saat kamu memintanya (cek mood opsional /
-   double-tap suara), dengan indikator privasi Android tetap muncul.
+5. **Mikrofon** hanya menyala saat kamu memintanya (double-tap suara / pesan suara),
+   dengan indikator privasi Android tetap muncul. Kamera tidak dipakai (v2.1:
+   cek mood kamera dihapus; izin CAMERA & ACTIVITY_RECOGNITION tidak diminta lagi).
 
 6. **Tangkap layar** (MediaProjection) butuh persetujuanmu tiap sesi.
 

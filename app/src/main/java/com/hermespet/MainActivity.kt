@@ -27,7 +27,6 @@ import com.hermespet.Prefs.backupUrl
 import com.hermespet.Prefs.backupUser
 import com.hermespet.Prefs.drivingMode
 import com.hermespet.Prefs.homeSsid
-import com.hermespet.Prefs.shakeSummon
 import com.hermespet.Prefs.homelabToken
 import com.hermespet.Prefs.lanDisplayName
 import com.hermespet.Prefs.smsReadEnabled
@@ -35,12 +34,9 @@ import com.hermespet.Prefs.lanNick
 import com.hermespet.Prefs.visionModel
 import com.hermespet.Prefs.latitude
 import com.hermespet.Prefs.longitude
-import com.hermespet.Prefs.moodCheckEnabled
 import com.hermespet.Prefs.musicDance
 import com.hermespet.Prefs.petScale
-import com.hermespet.Prefs.pillIdleSec
 import com.hermespet.Prefs.petVoice
-import com.hermespet.Prefs.sendMoodImage
 import com.hermespet.Prefs.setupDone
 import com.hermespet.Prefs.soulMd
 
@@ -204,25 +200,6 @@ class MainActivity : Activity() {
             })
         })
 
-        val pillLabel = TextView(this)
-        fun pillText(v: Int) = "Jadi pill (dynamic island) setelah diam: " +
-            if (v == 0) "tidak pernah" else "$v detik"
-        pillLabel.text = pillText(pillIdleSec)
-        col.addView(pillLabel)
-        col.addView(SeekBar(this).apply {
-            max = 24 // ×5 detik → 0..120
-            progress = pillIdleSec / 5
-            setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
-                override fun onProgressChanged(sb: SeekBar?, p: Int, fromUser: Boolean) {
-                    if (!fromUser) return
-                    pillIdleSec = p * 5
-                    pillLabel.text = pillText(p * 5)
-                }
-                override fun onStartTrackingTouch(sb: SeekBar?) {}
-                override fun onStopTrackingTouch(sb: SeekBar?) {}
-            })
-        })
-
         @Suppress("UseSwitchCompatOrMaterialCode")
         val voiceSwitch = Switch(this).apply {
             text = "Pet bersuara (membacakan ucapannya, TTS)"
@@ -247,35 +224,6 @@ class MainActivity : Activity() {
         }
         col.addView(driveSwitch)
         col.addView(hint("Butuh akses Baca notifikasi. Bisa juga: \"Moci, mode nyetir\"."))
-
-        @Suppress("UseSwitchCompatOrMaterialCode")
-        val shakeSwitch = Switch(this).apply {
-            text = "📳 Goyang HP untuk memanggil Moci (buka chat)"
-            isChecked = shakeSummon
-            setOnCheckedChangeListener { _, on -> shakeSummon = on; toastStatus("Restart pet agar berlaku") }
-        }
-        col.addView(shakeSwitch)
-
-        col.addView(TextView(this).apply {
-            text = Care.status(this@MainActivity) + "  (kasih makan 🍬 lewat menu chat)"
-            setPadding(0, 8, 0, 8)
-        })
-
-        @Suppress("UseSwitchCompatOrMaterialCode")
-        val moodSwitch = Switch(this).apply {
-            text = "Cek mood lewat kamera depan tiap jam"
-            isChecked = moodCheckEnabled
-            setOnCheckedChangeListener { _, on -> moodCheckEnabled = on }
-        }
-        col.addView(moodSwitch)
-
-        @Suppress("UseSwitchCompatOrMaterialCode")
-        val imgSwitch = Switch(this).apply {
-            text = "Kirim foto mood ke agent (bukan cuma ringkasan)"
-            isChecked = sendMoodImage
-            setOnCheckedChangeListener { _, on -> sendMoodImage = on }
-        }
-        col.addView(imgSwitch)
 
         col.addView(button("❓ Cara main dengan pet") { Help.gestures(this) })
         col.addView(button("🧙 Buka panduan setup (wizard)") {

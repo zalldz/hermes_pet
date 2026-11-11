@@ -28,12 +28,10 @@ object Permissions {
 
     /** Izin runtime biasa yang bisa diminta lewat dialog sistem sekaligus. */
     private val runtime: List<String> = buildList {
-        add(Manifest.permission.CAMERA)
         add(Manifest.permission.RECORD_AUDIO)
         add(Manifest.permission.ACCESS_COARSE_LOCATION)
         add(Manifest.permission.ACCESS_FINE_LOCATION)
         add(Manifest.permission.READ_CALENDAR)
-        if (Build.VERSION.SDK_INT >= 29) add(Manifest.permission.ACTIVITY_RECOGNITION)
         if (Build.VERSION.SDK_INT >= 33) add(Manifest.permission.POST_NOTIFICATIONS)
         // v2 fase 4 (READ_SMS sengaja tidak: diminta saat "Baca SMS" dinyalakan)
         add(Manifest.permission.READ_CONTACTS)
@@ -101,11 +99,8 @@ object Permissions {
         Perm("Baca notifikasi", notifListener(ctx), essential = false),
         Perm("Aksesibilitas (baca layar, tap, ketik)", accessibility(ctx), false),
         Perm("Data penggunaan (screen time & batas app)", Usage.granted(ctx), false),
-        Perm("Kamera (cek mood)", has(ctx, Manifest.permission.CAMERA), false),
         Perm("Mikrofon (perintah suara)", has(ctx, Manifest.permission.RECORD_AUDIO), false),
         Perm("Lokasi (cuaca otomatis)", has(ctx, Manifest.permission.ACCESS_COARSE_LOCATION), false),
-        Perm("Aktivitas (hitung langkah)",
-            Build.VERSION.SDK_INT < 29 || has(ctx, Manifest.permission.ACTIVITY_RECOGNITION), false),
         Perm("Kalender (pengingat acara)", has(ctx, Manifest.permission.READ_CALENDAR), false),
         Perm("Kontak & telepon (\"telepon Budi\")", has(ctx, Manifest.permission.READ_CONTACTS) &&
             has(ctx, Manifest.permission.CALL_PHONE), false),

@@ -14,9 +14,7 @@ multi-step, punya memori & perasaan — semua dalam **satu aplikasi Android** ya
   (butuh model vision, lihat di bawah).
 - **Kontrol HP** — volume, senter, kecerahan, musik, buka aplikasi apa pun, panel
   WiFi/Bluetooth, Jangan Ganggu, alarm, pengingat, catatan, cek lokasi/GPS.
-- **Indra** — notifikasi masuk, cuaca (ikut lokasi), cahaya, langkah, kalender, baterai,
-  cek mood lewat kamera depan (opsional).
-- **Rawat (Tamagotchi)** — kasih makan 🍬, dia senang; diabaikan, dia lesu.
+- **Indra** — notifikasi masuk, cuaca (ikut lokasi), kalender, baterai.
 - **Memori & skill** — ingat hal penting tentangmu; bisa membuat skill/makro sendiri.
 
 ## Baru di v2.0 — Moci mengelola HP-mu
@@ -28,14 +26,6 @@ multi-step, punya memori & perasaan — semua dalam **satu aplikasi Android** ya
 - Maksimal 8 putaran per perintah; tombol kirim/bayar/hapus/telepon selalu dikonfirmasi.
 - Aktifkan di wizard: **🖐 Aktifkan aksesibilitas**. Di Android 13+ (APK sideload) kalau
   tombolnya abu-abu: Info aplikasi → ⋮ → *Izinkan setelan terbatas*.
-
-**Fase 2 — Pill mode (dynamic island)**
-- Diam tanpa disentuh 30 detik → Moci menyusut jadi **pill kecil di atas-tengah layar**,
-  warnanya ikut mood & berdenyut pelan; jalan/fisika/animasi slime **berhenti** (hemat baterai).
-- **Ketuk pill** → mekar, slime jatuh memantul ke bawah, kembali jadi pet.
-- Notifikasi masuk saat mode pill → pill berkedip + **badge jumlah** (🔔 3), tanpa membuka.
-- Atur lama diamnya di Pengaturan → Pet (0 = tidak pernah jadi pill). Satu window yang
-  di-resize; di luar badan slime/pill sentuhan tembus ke aplikasi di bawahnya.
 
 **Fase 3 — Otomasi & screen time**
 - **Rules "kalau → maka"**: jam/hari, sambung/putus WiFi (SSID), baterai < X% / penuh,
@@ -73,8 +63,6 @@ multi-step, punya memori & perasaan — semua dalam **satu aplikasi Android** ya
 - **Teks layar (OCR via aksesibilitas)**: *"salin semua teks di layar"* (`copy_screen`),
   *"rangkum layar ini"*, *"terjemahkan layar ini ke Inggris"* — tanpa screenshot, langsung
   dari teks yang terbaca aksesibilitas.
-- **Goyang untuk memanggil** 📳: goyang HP 2× → pill mekar & kotak chat terbuka. Bisa
-  dimatikan di Pengaturan → Pet.
 
 ## Pasang & jalankan
 
