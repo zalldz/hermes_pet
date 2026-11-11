@@ -36,6 +36,9 @@ multi-step, punya memori & perasaan — semua dalam **satu aplikasi Android** ya
 - Orb **bersinar pelan**: 🔵 chat masuk (WA/Telegram/…), 🟡 rule otomasi jalan,
   🔴 batas app nyaris/udah habis (≤ 5 menit).
 - Satu window overlay yang di-resize; di luar orb sentuhan tembus ke aplikasi di bawahnya.
+- **Aset visual Kenney (CC0)**: orb (UI Pack), glow (Particle Pack), badan slime (New
+  Platformer Pack, di-tint warna mood; wajah piksel tetap). Rincian & lisensi:
+  [`app/src/main/assets/CREDITS.md`](app/src/main/assets/CREDITS.md). Gagal muat → gambar prosedural lama.
 
 **Fase 3 — Otomasi & screen time**
 - **Rules "kalau → maka"**: jam/hari, sambung/putus WiFi (SSID), baterai < X% / penuh,

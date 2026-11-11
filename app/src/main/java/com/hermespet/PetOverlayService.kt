@@ -113,6 +113,7 @@ class PetOverlayService : Service() {
         instance = this
         startAsForeground()
         wm = getSystemService(WINDOW_SERVICE) as WindowManager
+        Art.load(this)
         tts = TextToSpeech(this) { status ->
             if (status == TextToSpeech.SUCCESS) tts?.language = Locale("id", "ID")
         }

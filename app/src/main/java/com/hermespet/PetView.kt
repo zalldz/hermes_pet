@@ -3,6 +3,8 @@ package com.hermespet
 import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Color
+import android.graphics.LightingColorFilter
+import android.graphics.RectF
 import android.graphics.Paint
 import android.graphics.Path
 import android.view.View
@@ -81,6 +83,8 @@ class PetView(context: Context) : View(context) {
     private val angryC = Paint().apply { color = Color.parseColor("#C62828") }
 
     private var phase = 0f
+    private val spriteP = Paint(Paint.FILTER_BITMAP_FLAG)
+    private val spriteDst = RectF()
     private var blink = false
     private var nextBlinkAt = System.currentTimeMillis() + 2000
 
@@ -226,7 +230,14 @@ class PetView(context: Context) : View(context) {
         canvas.scale(sx, sy, w / 2f, baseY)
         if (facing < 0) canvas.scale(-1f, 1f, w / 2f, h / 2f)
 
-        for (r in base.indices) {
+        val sprite = Art.slime
+        if (sprite != null) {
+            // badan slime Kenney (grayscale) di-tint warna mood; wajah tetap piksel di atasnya
+            spriteP.colorFilter = LightingColorFilter(cur[0], 0)
+            val hCells = 16f * sprite.height / sprite.width
+            spriteDst.set(offX, offY + cell * (15f - hCells), offX + cell * 16f, offY + cell * 15f)
+            canvas.drawBitmap(sprite, null, spriteDst, spriteP)
+        } else for (r in base.indices) { // fallback prosedural
             val row = base[r]
             for (c in row.indices) {
                 when (row[c]) {
