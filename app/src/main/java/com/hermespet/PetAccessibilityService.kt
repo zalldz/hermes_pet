@@ -20,6 +20,8 @@ class PetAccessibilityService : AccessibilityService() {
         /** Paket aplikasi yang sedang tampil (untuk otomasi "app dibuka" & batas waktu). */
         @Volatile var currentPkg: String = ""
         private const val MAX_TEXT = 3500
+        /** App di depan sedang fullscreen (status bar tersembunyi) — untuk Respect focus. */
+        @Volatile var fullscreen = false
     }
 
     override fun onServiceConnected() { instance = this }
@@ -48,6 +50,8 @@ class PetAccessibilityService : AccessibilityService() {
             }
             return
         }
+        if (e.eventType == AccessibilityEvent.TYPE_WINDOWS_CHANGED ||
+            e.eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) checkFullscreen()
         if (e.eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
             val pkg = e.packageName?.toString() ?: return
             // abaikan diri sendiri, status bar & keyboard (bukan "aplikasi dibuka")
@@ -57,6 +61,33 @@ class PetAccessibilityService : AccessibilityService() {
                 currentPkg = pkg
                 PetOverlayService.instance?.onAppChanged(pkg)
             }
+        }
+    }
+
+    private var sawStatusBar = false
+    private var lastFsCheck = 0L
+
+    /**
+     * Fullscreen = jendela status bar (TYPE_SYSTEM menempel di atas) tidak ada. Baru dianggap
+     * valid setelah status bar pernah terlihat sekali — ROM yang tak melaporkannya tidak
+     * membuat pet hilang terus.
+     */
+    private fun checkFullscreen() {
+        val now = System.currentTimeMillis()
+        if (now - lastFsCheck < 400) return // WINDOWS_CHANGED bisa beruntun (overlay bergerak)
+        lastFsCheck = now
+        val bar = runCatching {
+            val r = Rect()
+            windows.any { w ->
+                w.type == android.view.accessibility.AccessibilityWindowInfo.TYPE_SYSTEM &&
+                    w.getBoundsInScreen(r).let { r.top == 0 && r.height() in 1 until resources.displayMetrics.heightPixels / 8 }
+            }
+        }.getOrDefault(true)
+        if (bar) sawStatusBar = true
+        val fs = sawStatusBar && !bar && currentPkg.isNotEmpty()
+        if (fs != fullscreen) {
+            fullscreen = fs
+            PetOverlayService.instance?.onFocusChanged()
         }
     }
 

@@ -45,6 +45,7 @@ import com.hermespet.Prefs.petScale
 import com.hermespet.Prefs.petVoice
 import com.hermespet.Prefs.petX
 import com.hermespet.Prefs.petY
+import com.hermespet.Prefs.respectFocus
 import org.json.JSONObject
 import java.util.Calendar
 import java.util.Locale
@@ -104,6 +105,9 @@ class PetOverlayService : Service() {
     private var orbPeek = false
     /** Disembunyikan total sampai waktu ini (menu "Sembunyikan 1 jam"). */
     private var hiddenUntil = 0L
+    /** Respect focus: app fullscreen/game di depan → pet & orb menghilang total. */
+    private var focusHidden = false
+    private fun suppressed() = focusHidden || System.currentTimeMillis() < hiddenUntil
     private var lastActivityAt = System.currentTimeMillis()
 
     override fun onBind(intent: Intent?): IBinder? = null
@@ -592,6 +596,30 @@ class PetOverlayService : Service() {
         if (blockerView != null && pkg != blockerPkg) hideBlocker()
         checkRules(ruleState(pkg))
         checkLimit(pkg)
+        onFocusChanged(pkg)
+    }
+
+    /** Respect focus: sembunyikan pet & orb saat game/app fullscreen; rules tetap jalan. */
+    fun onFocusChanged(pkg: String? = Usage.foreground(this)) = handler.post {
+        val focus = respectFocus && pkg != null && pkg != packageName &&
+            (PetAccessibilityService.fullscreen || isGame(pkg))
+        if (focus == focusHidden) return@post
+        focusHidden = focus
+        if (focus) { closeChat(); closeOrbMenu(); hideBubble.run(); pet.awake = false }
+        else pet.awake = screenOn && !orbMode
+        refreshVisibility()
+        PetLog.add(this, "aksi", if (focus) "🎮 fokus ($pkg) → Moci minggir" else "🎮 fokus selesai")
+    }
+
+    private fun isGame(pkg: String): Boolean = runCatching {
+        val ai = packageManager.getApplicationInfo(pkg, 0)
+        @Suppress("DEPRECATION")
+        ai.category == android.content.pm.ApplicationInfo.CATEGORY_GAME ||
+            (ai.flags and android.content.pm.ApplicationInfo.FLAG_IS_GAME) != 0
+    }.getOrDefault(false)
+
+    private fun refreshVisibility() {
+        root.visibility = if (suppressed()) View.GONE else View.VISIBLE
     }
 
     private var blockerView: View? = null
@@ -799,6 +827,8 @@ class PetOverlayService : Service() {
         closeOrbMenu()
         orb.glowColor = 0
         val items = listOf<Pair<String, () -> Unit>>(
+            "👀  Glimpse (rangkum layar)" to { glimpse() },
+            "🔔  Ringkas notif" to { triageNotifs() },
             "🙈  Sembunyikan 1 jam" to { hideFor(3_600_000L) },
         )
         val box = LinearLayout(this).apply {
@@ -840,14 +870,36 @@ class PetOverlayService : Service() {
         orbMenu = null
     }
 
+    /** GLIMPSE: baca layar aktif (aksesibilitas) → otak merangkum → bubble komik. */
+    private fun glimpse() {
+        val a11y = PetAccessibilityService.instance
+        if (a11y == null) {
+            say("Aktifkan dulu Aksesibilitas \"Mocipet\" biar aku bisa ngintip layar 🙏", PetView.Emotion.SAD)
+            return
+        }
+        val screen = a11y.screenText() // baca dulu sebelum pet muncul
+        PetLog.add(this, "user", "👀 glimpse (${screen.length} huruf)")
+        say("👀 Ngintip layar...", PetView.Emotion.SURPRISED)
+        sendToBrain("glimpse", JSONObject().put("screen", screen))
+    }
+
+    /** NOTIF TRIAGE: notif terakhir per app → otak meringkas penting vs noise → bubble. */
+    private fun triageNotifs() {
+        if (!Permissions.notifListener(this)) {
+            say("Kasih aku akses Baca notifikasi dulu ya 🙏", PetView.Emotion.SAD)
+            return
+        }
+        PetLog.add(this, "user", "🔔 notif triage")
+        say("🔔 Merangkum notif...", PetView.Emotion.SURPRISED)
+        sendToBrain("triage", JSONObject().put("digest", NotifListener.digest(this, 20)))
+    }
+
     /** Sembunyikan pet & orb total selama `ms`; rules & batas app tetap jalan. */
     private fun hideFor(ms: Long) {
         hiddenUntil = System.currentTimeMillis() + ms
         hideBubble.run()
-        root.visibility = View.GONE
-        handler.postDelayed({
-            if (System.currentTimeMillis() >= hiddenUntil) root.visibility = View.VISIBLE
-        }, ms)
+        refreshVisibility()
+        handler.postDelayed({ refreshVisibility() }, ms + 50)
         PetLog.add(this, "aksi", "🙈 disembunyikan ${ms / 60_000} menit")
     }
 
@@ -963,7 +1015,7 @@ class PetOverlayService : Service() {
 
     private val walkLoop = object : Runnable {
         override fun run() {
-            if (!screenOn || orbMode) { // layar mati / orb → jangan render/gerak (hemat baterai)
+            if (!screenOn || orbMode || focusHidden) { // layar mati / orb / fokus → jangan render/gerak (hemat baterai)
                 handler.postDelayed(this, 1_000)
                 return
             }
@@ -1037,7 +1089,7 @@ class PetOverlayService : Service() {
             senses.keys().forEach { k -> data.put(k, senses.get(k)) }
             sendToBrain("tick", data)
             checkRules(ruleState())
-            Usage.foreground(this@PetOverlayService)?.let { checkLimit(it) }
+            Usage.foreground(this@PetOverlayService)?.let { checkLimit(it); onFocusChanged(it) }
             handler.postDelayed(this, TICK_MS)
         }
     }
@@ -1119,7 +1171,7 @@ class PetOverlayService : Service() {
     /** Sembunyikan pet+gelembung sesaat agar tidak ikut tertangkap screenshot. */
     fun setOverlayHidden(hidden: Boolean) = handler.post {
         val v = if (hidden) View.INVISIBLE else View.VISIBLE
-        root.visibility = if (System.currentTimeMillis() < hiddenUntil) View.GONE else v
+        root.visibility = if (suppressed()) View.GONE else v
         if (bubbleShown) bubble.visibility = v
     }
 
@@ -1373,7 +1425,7 @@ class PetOverlayService : Service() {
     }
 
     private fun say(text: String, emotion: PetView.Emotion?, typewriter: Boolean = false) {
-        if (System.currentTimeMillis() < hiddenUntil) return // disembunyikan pemilik
+        if (suppressed()) return // disembunyikan pemilik / respect focus
         if (orbMode) expandFromOrb()
         lastActivityAt = System.currentTimeMillis()
         emotion?.let { pet.emotion = it }

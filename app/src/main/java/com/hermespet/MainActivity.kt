@@ -37,6 +37,7 @@ import com.hermespet.Prefs.longitude
 import com.hermespet.Prefs.musicDance
 import com.hermespet.Prefs.petScale
 import com.hermespet.Prefs.petVoice
+import com.hermespet.Prefs.respectFocus
 import com.hermespet.Prefs.setupDone
 import com.hermespet.Prefs.soulMd
 
@@ -224,6 +225,18 @@ class MainActivity : Activity() {
         }
         col.addView(driveSwitch)
         col.addView(hint("Butuh akses Baca notifikasi. Bisa juga: \"Moci, mode nyetir\"."))
+
+        @Suppress("UseSwitchCompatOrMaterialCode")
+        val focusSwitch = Switch(this).apply {
+            text = "🎮 Respect focus: Moci minggir saat game / app fullscreen"
+            isChecked = respectFocus
+            setOnCheckedChangeListener { _, on ->
+                respectFocus = on
+                PetOverlayService.instance?.onFocusChanged()
+            }
+        }
+        col.addView(focusSwitch)
+        col.addView(hint("Rules & batas app tetap jalan. Fullscreen terdeteksi lewat Aksesibilitas."))
 
         col.addView(button("❓ Cara main dengan pet") { Help.gestures(this) })
         col.addView(button("🧙 Buka panduan setup (wizard)") {

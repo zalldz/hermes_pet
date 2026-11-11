@@ -1,4 +1,4 @@
-# 🐾 Mocipet — v2.0 "super smart pet"
+# 🐾 Mocipet — v2.1 "Ghost Orb"
 
 **Moci** adalah pet virtual slime cerdas yang jalan-jalan sebagai **overlay di atas
 semua aplikasi** di Android. Bisa ngobrol (streaming), lihat layar, kontrol HP,
@@ -39,6 +39,19 @@ multi-step, punya memori & perasaan — semua dalam **satu aplikasi Android** ya
 - **Aset visual Kenney (CC0)**: orb (UI Pack), glow (Particle Pack), badan slime (New
   Platformer Pack, di-tint warna mood; wajah piksel tetap). Rincian & lisensi:
   [`app/src/main/assets/CREDITS.md`](app/src/main/assets/CREDITS.md). Gagal muat → gambar prosedural lama.
+
+**v2.1 — 4 fitur yang beneran kepake**
+- **Rule pakai bicara**: *"tiap jam 11 malam diemin HP gue"* → Moci membuat rule
+  (`create_rule`, format rule Fase 3 yang sama) & **minta konfirmasi** sebelum memasang.
+  *"otomasi apa aja?"* (`list_rules`), *"hapus otomasi Diam jam 23"* (`delete_rule`).
+- **Glimpse** 👀: tahan orb → *Glimpse* → teks layar aktif dibaca lewat aksesibilitas →
+  Moci merangkum konteksnya di bubble komik (dokumen, resep, chat panjang). Tanpa aksi.
+- **Notif triage** 🔔: tahan orb → *Ringkas notif*, atau *"ringkas notif"* (`notif_summary`)
+  → 20 notif terakhir dikelompokkan per app → *"3 penting (Budi, Ibu…), 12 noise (Shopee…)"*
+  di bubble, bukan notif baru. Notif hanya disimpan di memori (50 terakhir).
+- **Respect focus** 🎮: game (kategori Game) atau app fullscreen (status bar tersembunyi,
+  via aksesibilitas) → orb & pet hilang total; rules & batas app tetap jalan. Kembali normal
+  saat keluar. Bisa dimatikan di Pengaturan → Pet (default ON).
 
 **Fase 3 — Otomasi & screen time**
 - **Rules "kalau → maka"**: jam/hari, sambung/putus WiFi (SSID), baterai < X% / penuh,

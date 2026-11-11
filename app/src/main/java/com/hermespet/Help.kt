@@ -16,7 +16,8 @@ object Help {
             👁  (di chat)  → suruh dia lihat layar
 
             Diam 30 detik → Moci jadi ORB bulat transparan di tepi layar:
-            ⚪ Tap → Moci keluar • Tap 2x → chat • Tahan → menu mini
+            ⚪ Tap → Moci keluar • Tap 2x → chat
+            ⚪ Tahan → Glimpse (rangkum layar) / Ringkas notif / Sembunyikan 1 jam
             ⚪ Seret → pindah, nempel ke tepi terdekat
             Orb bersinar: biru notif chat • kuning otomasi • merah batas app
 

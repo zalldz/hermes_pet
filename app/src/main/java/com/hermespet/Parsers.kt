@@ -8,6 +8,18 @@ import org.json.JSONObject
  */
 object Parsers {
 
+    /**
+     * Ringkas notif (pkg, judul, isi) per aplikasi untuk triage — urutan app mengikuti
+     * notif terbaru. `label` mengubah nama paket jadi nama app.
+     */
+    fun notifDigest(items: List<Triple<String, String, String>>, label: (String) -> String): String {
+        if (items.isEmpty()) return "Belum ada notifikasi tercatat."
+        return items.groupBy { it.first }.entries.joinToString("\n") { (pkg, list) ->
+            "${label(pkg)} (${list.size}): " +
+                list.take(5).joinToString(" | ") { "${it.second}: ${it.third.take(80)}" }
+        }
+    }
+
     fun reply(say: String?, emotion: String?): JSONObject =
         JSONObject().apply {
             say?.let { put("say", it) }

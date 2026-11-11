@@ -7,6 +7,13 @@ import org.junit.Test
 /** Unit test untuk parser balasan model & streaming. Jalankan: gradle test */
 class ParsersTest {
 
+    @Test fun notifDigest_groupsPerApp() {
+        val d = Parsers.notifDigest(listOf(
+            Triple("wa", "Budi", "otw"), Triple("shop", "Promo", "diskon"), Triple("wa", "Ibu", "makan")
+        )) { it.uppercase() }
+        assertEquals("WA (2): Budi: otw | Ibu: makan\nSHOP (1): Promo: diskon", d)
+    }
+
     @Test fun extractJson_basic() {
         val r = Parsers.extractJson("""{"say":"halo","emotion":"happy"}""")!!
         assertEquals("halo", r.optString("say"))

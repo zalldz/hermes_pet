@@ -176,6 +176,11 @@ object Prefs {
         get() = sp(this).getBoolean("driving_mode", false)
         set(v) = sp(this).edit().putBoolean("driving_mode", v).apply()
 
+    /** Respect focus: app fullscreen/game → pet & orb menghilang (rules tetap jalan). */
+    var Context.respectFocus: Boolean
+        get() = sp(this).getBoolean("respect_focus", true)
+        set(v) = sp(this).edit().putBoolean("respect_focus", v).apply()
+
     // --- v2.1 Ghost Orb: posisi terakhir (tepi kanan/kiri + tinggi) ---
     var Context.orbRight: Boolean
         get() = sp(this).getBoolean("orb_right", true)

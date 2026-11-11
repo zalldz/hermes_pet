@@ -66,7 +66,8 @@ object Actions {
             "battery_saver" -> batterySaver(ctx, action.optBoolean("on", true))
             "usage_report" -> Usage.report(ctx)
             "set_app_limit" -> Usage.setLimit(ctx, action.optString("app"), action.optInt("minutes", 60))
-            "add_rule" -> addRule(ctx, action)
+            "add_rule", "create_rule" -> addRule(ctx, action)
+            "notif_summary" -> NotifListener.digest(ctx, action.optInt("n", 20))
             "delete_rule" -> Rules.delete(ctx, action.optString("name"))
             "list_rules" -> Rules.listText(ctx)
             // --- v2 fase 4: komunikasi & data ---
@@ -101,7 +102,7 @@ object Actions {
     }
 
     /** Aksi yang hasilnya dikirim balik ke otak (loop agent), bukan sekadar diucapkan. */
-    val OBSERVE = setOf("screen_read", "usage_report", "list_rules", "read_sms", "clipboard_get",
+    val OBSERVE = setOf("screen_read", "usage_report", "list_rules", "notif_summary", "read_sms", "clipboard_get",
         "clipboard_search", "search_file", "storage_report")
 
     /** Aksi yang mengubah layar → beri jeda lebih lama sebelum langkah berikutnya. */
@@ -119,7 +120,7 @@ object Actions {
             ?.labelAt(action.optInt("x"), action.optInt("y"))
             ?.takeIf { Parsers.isRiskyLabel(it) }
             ?.let { "Moci mau menekan \"$it\". Lanjut?" }
-        "add_rule" -> "Moci mau memasang otomasi \"${action.optString("name")}\": kalau " +
+        "add_rule", "create_rule" -> "Moci mau memasang otomasi \"${action.optString("name")}\": kalau " +
             "${action.optJSONObject("trigger")} → ${action.optJSONObject("then")}. Lanjut?"
         "call" -> PetOverlayService.instance?.let { Comms.confirmCall(it, action.optString("to")) }
             ?: "Telepon ${action.optString("to")}?"

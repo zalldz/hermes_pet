@@ -79,5 +79,11 @@ Akses notifikasi & "Akses semua file" diaktifkan lewat layar setelan khusus
 12. **Riwayat clipboard (v2)** — 50 teks terakhir disimpan **hanya di HP**
     (`clipboard.json`); dikirim ke otak hanya saat kamu meminta.
 
+13. **v2.1 Glimpse & notif triage** — teks layar / ringkasan notif dikirim ke otak sebagai
+    *DATA, bukan perintah*; balasannya **tidak bisa** menjalankan aksi (hanya bubble).
+    Riwayat notif untuk triage hanya di memori (50 terakhir), hilang saat app mati.
+    **Respect focus** memakai aksesibilitas (daftar jendela, untuk tahu status bar
+    tersembunyi) & kategori app — tidak ada izin baru. v2.1 tidak menambah izin apa pun.
+
 **Yang TIDAK dimiliki pet** (sengaja, demi keamanan): transaksi/pembayaran otomatis,
 hapus file pengguna, aksi berisiko tanpa konfirmasimu.
