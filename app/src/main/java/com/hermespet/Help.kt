@@ -15,6 +15,11 @@ object Help {
             🤏  Cubit      → ubah ukuran
             👁  (di chat)  → suruh dia lihat layar
 
+            Diam 30 detik → Moci jadi ORB bulat transparan di tepi layar:
+            ⚪ Tap → Moci keluar • Tap 2x → chat • Tahan → menu mini
+            ⚪ Seret → pindah, nempel ke tepi terdekat
+            Orb bersinar: biru notif chat • kuning otomasi • merah batas app
+
             Pet juga berganti WARNA sesuai perasaannya:
             hijau senang • biru sedih • merah kesal • ungu ngantuk
         """.trimIndent()

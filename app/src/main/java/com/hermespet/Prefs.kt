@@ -176,6 +176,15 @@ object Prefs {
         get() = sp(this).getBoolean("driving_mode", false)
         set(v) = sp(this).edit().putBoolean("driving_mode", v).apply()
 
+    // --- v2.1 Ghost Orb: posisi terakhir (tepi kanan/kiri + tinggi) ---
+    var Context.orbRight: Boolean
+        get() = sp(this).getBoolean("orb_right", true)
+        set(v) = sp(this).edit().putBoolean("orb_right", v).apply()
+
+    var Context.orbY: Int
+        get() = sp(this).getInt("orb_y", -1)
+        set(v) = sp(this).edit().putInt("orb_y", v).apply()
+
     var Context.petX: Int
         get() = sp(this).getInt("pet_x", 100)
         set(v) = sp(this).edit().putInt("pet_x", v).apply()

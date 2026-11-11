@@ -27,6 +27,16 @@ multi-step, punya memori & perasaan — semua dalam **satu aplikasi Android** ya
 - Aktifkan di wizard: **🖐 Aktifkan aksesibilitas**. Di Android 13+ (APK sideload) kalau
   tombolnya abu-abu: Info aplikasi → ⋮ → *Izinkan setelan terbatas*.
 
+**v2.1 — Ghost Orb** (pengganti pill)
+- Diam 30 detik → Moci menyusut jadi **orb bulat 28dp semi-transparan** di tepi kanan,
+  mirip tombol aksesibilitas melayang. Jalan/fisika/joget slime **berhenti** (hemat baterai).
+- Tak disentuh beberapa detik → orb **menyelinap** (60% terlihat) & makin lama makin pudar.
+- **Tap** → slime keluar memantul • **Tap 2x** → kotak chat • **Tahan** → menu mini
+  (Sembunyikan 1 jam, dll.) • **Seret** → pindah, nempel ke tepi terdekat (posisi diingat).
+- Orb **bersinar pelan**: 🔵 chat masuk (WA/Telegram/…), 🟡 rule otomasi jalan,
+  🔴 batas app nyaris/udah habis (≤ 5 menit).
+- Satu window overlay yang di-resize; di luar orb sentuhan tembus ke aplikasi di bawahnya.
+
 **Fase 3 — Otomasi & screen time**
 - **Rules "kalau → maka"**: jam/hari, sambung/putus WiFi (SSID), baterai < X% / penuh,
   masuk/keluar radius lokasi, aplikasi tertentu dibuka → DND, senyap, hemat baterai,

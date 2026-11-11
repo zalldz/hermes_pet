@@ -39,6 +39,8 @@ import com.hermespet.Prefs.homeSsid
 import com.hermespet.Prefs.latitude
 import com.hermespet.Prefs.longitude
 import com.hermespet.Prefs.musicDance
+import com.hermespet.Prefs.orbRight
+import com.hermespet.Prefs.orbY
 import com.hermespet.Prefs.petScale
 import com.hermespet.Prefs.petVoice
 import com.hermespet.Prefs.petX
@@ -58,6 +60,13 @@ class PetOverlayService : Service() {
         private const val BASE_SIZE_DP = 144 // View lebih besar; sprite isi ~66% + ruang gerak
         private const val TICK_MS = 60_000L
         private const val WALK_FRAME_MS = 16L // ~60 fps
+        private const val ORB_VIEW_DP = 44f // bulatan 28dp + ruang glow; target sentuh nyaman
+        private const val ORB_IDLE_MS = 30_000L // pet diam segini → jadi orb
+        private const val ORB_PEEK_MS = 4_000L  // orb tak disentuh segini → menyelinap ke tepi
+        private const val ORB_FADE_MS = 60_000L // makin lama → makin pudar
+        val GLOW_BLUE = Color.parseColor("#4FA3FF")   // notif penting
+        val GLOW_YELLOW = Color.parseColor("#FFC93C") // rule/otomasi jalan
+        val GLOW_RED = Color.parseColor("#FF5252")    // batas app nyaris/udah habis
         /** Aplikasi chat yang dibacakan saat mode nyetir. */
         private val CHAT_APPS = listOf("com.whatsapp", "org.telegram", "org.thunderdog.challegram",
             "jp.naver.line", "org.thoughtcrime.securesms", "com.facebook.orca",
@@ -88,6 +97,13 @@ class PetOverlayService : Service() {
     private var nextHopAt = 0L
     private val hopDurMs = 520L
 
+    // --- GHOST ORB (v2.1): 2 state pet ↔ orb, satu window yang di-resize ---
+    private lateinit var orb: OrbView
+    private var orbMode = false
+    private var orbTouchedAt = 0L
+    private var orbPeek = false
+    /** Disembunyikan total sampai waktu ini (menu "Sembunyikan 1 jam"). */
+    private var hiddenUntil = 0L
     private var lastActivityAt = System.currentTimeMillis()
 
     override fun onBind(intent: Intent?): IBinder? = null
@@ -110,6 +126,7 @@ class PetOverlayService : Service() {
         handler.postDelayed(tickLoop, 5_000)
         handler.post(moodTick)
         handler.postDelayed(musicLoop, 3_000)
+        handler.postDelayed(orbLoop, 5_000)
         startLan()
         pet.emotion = Mood.current(this)
         say("Halo! Aku hidup! 🐾", PetView.Emotion.HAPPY)
@@ -151,7 +168,7 @@ class PetOverlayService : Service() {
             when (i?.action) {
                 Intent.ACTION_SCREEN_OFF -> { screenOn = false; pet.awake = false; stopVisualizer() }
                 Intent.ACTION_SCREEN_ON -> {
-                    screenOn = true; pet.awake = true
+                    screenOn = true; pet.awake = !orbMode
                     pet.emotion = Mood.current(this@PetOverlayService)
                 }
                 Intent.ACTION_USER_PRESENT -> maybeGreet() // buka kunci → sapa
@@ -187,6 +204,7 @@ class PetOverlayService : Service() {
         tts?.shutdown()
         runCatching { unregisterReceiver(screenReceiver) }
         closeChat()
+        closeOrbMenu()
         hideBlocker()
         if (bubbleShown) runCatching { wm.removeView(bubble) }
         runCatching { wm.removeView(root) }
@@ -203,6 +221,11 @@ class PetOverlayService : Service() {
             gravity = Gravity.CENTER_HORIZONTAL
             addView(pet)
         }
+        orb = OrbView(this).apply {
+            visibility = View.GONE
+            contentDescription = "Moci (ketuk: buka, ketuk 2x: chat, tahan: menu)"
+        }
+        root.addView(orb, LinearLayout.LayoutParams(dp(ORB_VIEW_DP).toInt(), dp(ORB_VIEW_DP).toInt()))
 
         lp = WindowManager.LayoutParams(
             WindowManager.LayoutParams.WRAP_CONTENT,
@@ -210,6 +233,7 @@ class PetOverlayService : Service() {
             WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
                 WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
+                WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or // orb boleh "menyelinap" keluar tepi
                 WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED, // anti-flicker
             PixelFormat.TRANSLUCENT
         ).apply {
@@ -273,6 +297,7 @@ class PetOverlayService : Service() {
         var lastMoveX = 0f; var lastMoveY = 0f; var lastMoveT = 0L
 
         root.setOnTouchListener { _, ev ->
+            if (orbMode) return@setOnTouchListener onOrbTouch(ev)
             lastActivityAt = System.currentTimeMillis()
             scaleDetector.onTouchEvent(ev)
             if (ev.pointerCount > 1) return@setOnTouchListener true
@@ -547,6 +572,7 @@ class PetOverlayService : Service() {
             else -> queue.add(a)
         }
         PetLog.add(this, "aksi", "⚙️ otomasi: ${acts.joinToString { it.optString("type") }}")
+        glow(GLOW_YELLOW)
         if (queue.isNotEmpty()) runActionQueue(queue, sayFeedback = true)
     }
 
@@ -572,6 +598,7 @@ class PetOverlayService : Service() {
 
     private fun checkLimit(pkg: String) {
         if (blockerView != null || pkg == packageName) return
+        Usage.remaining(this, pkg)?.let { if (it <= 5) glow(GLOW_RED) } // nyaris/udah habis
         val used = Usage.overLimit(this, pkg) ?: return
         showBlocker(pkg, used)
     }
@@ -619,6 +646,208 @@ class PetOverlayService : Service() {
     private fun hideBlocker() {
         blockerView?.let { runCatching { wm.removeView(it) } }
         blockerView = null; blockerPkg = ""
+    }
+
+    // ---------------------------------------------------------------- ghost orb (v2.1)
+
+    /** Tiap 2 detik: pet diam lama → orb; orb tak disentuh → menyelinap & memudar. */
+    private val orbLoop = object : Runnable {
+        override fun run() {
+            val now = System.currentTimeMillis()
+            if (!orbMode) {
+                if (screenOn && chatView == null && !bubbleShown && !flinging &&
+                    now - lastActivityAt > ORB_IDLE_MS && now > pausedUntil) collapseToOrb()
+            } else if (orb.glowColor == 0) {
+                val idle = now - orbTouchedAt
+                if (idle > ORB_PEEK_MS && !orbPeek) { orbPeek = true; placeOrb(animate = true) }
+                orb.animate().alpha(if (idle > ORB_FADE_MS) 0.45f else if (orbPeek) 0.7f else 1f)
+                    .setDuration(400).start()
+            }
+            handler.postDelayed(this, 2_000)
+        }
+    }
+
+    private fun screenW() = resources.displayMetrics.widthPixels
+    private fun orbSize() = dp(ORB_VIEW_DP).toInt()
+
+    /** X window orb: menempel tepi; saat "peek" hanya 60% bulatan yang terlihat. */
+    private fun orbX(): Int {
+        val size = orbSize()
+        val r = orb.orbRadius
+        val hiddenPx = if (orbPeek) (2 * r * 0.4f).toInt() else -dp(4f).toInt()
+        val inset = ((size - 2 * r) / 2).toInt() // jarak tepi view ↔ tepi bulatan
+        return if (orbRight) screenW() - size + inset + hiddenPx else -inset - hiddenPx
+    }
+
+    private fun placeOrb(animate: Boolean) {
+        val targetX = orbX()
+        if (orbY < 0) orbY = (resources.displayMetrics.heightPixels * 0.4f).toInt()
+        lp.y = orbY
+        if (!animate) { lp.x = targetX; runCatching { wm.updateViewLayout(root, lp) }; return }
+        android.animation.ValueAnimator.ofInt(lp.x, targetX).apply {
+            duration = 220
+            addUpdateListener {
+                if (!orbMode) { cancel(); return@addUpdateListener }
+                lp.x = it.animatedValue as Int
+                runCatching { wm.updateViewLayout(root, lp) }
+            }
+            start()
+        }
+    }
+
+    private fun collapseToOrb() {
+        if (orbMode) return
+        orbMode = true
+        closeChat()
+        pet.awake = false
+        stopVisualizer()
+        petX = lp.x; petY = lp.y
+        pet.visibility = View.GONE
+        orb.visibility = View.VISIBLE
+        orbTouchedAt = System.currentTimeMillis(); orbPeek = false
+        placeOrb(animate = false)
+        orb.scaleX = 0.3f; orb.scaleY = 0.3f
+        orb.animate().scaleX(1f).scaleY(1f).alpha(1f).setDuration(220).start()
+    }
+
+    /** Orb → mekar → slime jatuh dari orb (pakai fisika lempar yang sudah ada) → PET. */
+    private fun expandFromOrb(then: (() -> Unit)? = null) {
+        if (!orbMode) { then?.invoke(); return }
+        orbMode = false
+        orb.glowColor = 0
+        lastActivityAt = System.currentTimeMillis()
+        orb.animate().scaleX(1.4f).scaleY(1.4f).alpha(0f).setDuration(140).withEndAction {
+            orb.visibility = View.GONE
+            orb.scaleX = 1f; orb.scaleY = 1f; orb.alpha = 1f
+            pet.visibility = View.VISIBLE
+            pet.awake = screenOn
+            val size = (dp(BASE_SIZE_DP.toFloat()) * petScale).toInt()
+            val orbCenter = lp.x + orbSize() / 2
+            lp.x = (orbCenter - size / 2).coerceIn(0, (screenW() - size).coerceAtLeast(0))
+            runCatching { wm.updateViewLayout(root, lp) }
+            root.post { velX = 0f; velY = 0f; startFling() } // "slime drop"
+            then?.invoke()
+        }.start()
+    }
+
+    /** Orb bersinar pelan; prioritas merah > kuning > biru (tidak turun kelas). */
+    private fun glow(color: Int) {
+        if (!orbMode) return
+        val rank = listOf(0, GLOW_BLUE, GLOW_YELLOW, GLOW_RED)
+        if (rank.indexOf(color) <= rank.indexOf(orb.glowColor)) return
+        orb.glowColor = color
+        orbPeek = false; placeOrb(animate = true)
+        orb.animate().alpha(1f).setDuration(200).start()
+    }
+
+    private var orbDownX = 0f; private var orbDownY = 0f
+    private var orbStartX = 0; private var orbStartY = 0
+    private var orbDragging = false
+    private var orbLongPressed = false
+    private var orbLastTapAt = 0L
+    private val orbLongPress = Runnable { orbLongPressed = true; showOrbMenu() }
+    private val orbSingleTap = Runnable { expandFromOrb() }
+
+    private fun onOrbTouch(ev: MotionEvent): Boolean {
+        orbTouchedAt = System.currentTimeMillis()
+        when (ev.actionMasked) {
+            MotionEvent.ACTION_DOWN -> {
+                orbDownX = ev.rawX; orbDownY = ev.rawY
+                if (orbPeek) { orbPeek = false; lp.x = orbX(); runCatching { wm.updateViewLayout(root, lp) } }
+                orbStartX = lp.x; orbStartY = lp.y
+                orbDragging = false; orbLongPressed = false
+                orb.alpha = 1f
+                handler.postDelayed(orbLongPress, 450)
+            }
+            MotionEvent.ACTION_MOVE -> {
+                val dx = ev.rawX - orbDownX; val dy = ev.rawY - orbDownY
+                if (!orbDragging && (abs(dx) > 12 || abs(dy) > 12)) {
+                    orbDragging = true; handler.removeCallbacks(orbLongPress)
+                }
+                if (orbDragging) {
+                    lp.x = orbStartX + dx.toInt(); lp.y = orbStartY + dy.toInt()
+                    runCatching { wm.updateViewLayout(root, lp) }
+                }
+            }
+            MotionEvent.ACTION_UP -> {
+                handler.removeCallbacks(orbLongPress)
+                val now = System.currentTimeMillis()
+                when {
+                    orbDragging -> { // snap ke tepi terdekat
+                        orbRight = lp.x + orbSize() / 2 > screenW() / 2
+                        orbY = lp.y.coerceIn(0, resources.displayMetrics.heightPixels - orbSize())
+                        placeOrb(animate = true)
+                    }
+                    orbLongPressed -> {}
+                    now - orbLastTapAt < 300 -> { // tap 2x → kotak chat langsung
+                        handler.removeCallbacks(orbSingleTap); orbLastTapAt = 0
+                        expandFromOrb { if (chatView == null) toggleChat() }
+                    }
+                    else -> { orbLastTapAt = now; handler.postDelayed(orbSingleTap, 300) }
+                }
+            }
+            MotionEvent.ACTION_CANCEL -> handler.removeCallbacks(orbLongPress)
+        }
+        return true
+    }
+
+    private var orbMenu: View? = null
+
+    /** Menu mini (long-press orb). */
+    private fun showOrbMenu() {
+        closeOrbMenu()
+        orb.glowColor = 0
+        val items = listOf<Pair<String, () -> Unit>>(
+            "🙈  Sembunyikan 1 jam" to { hideFor(3_600_000L) },
+        )
+        val box = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            background = GradientDrawable().apply {
+                setColor(Color.argb(235, 255, 255, 255)); cornerRadius = dp(14f)
+            }
+            elevation = dp(6f)
+            val p = dp(6f).toInt(); setPadding(p, p, p, p)
+            for ((label, act) in items) addView(TextView(context).apply {
+                text = label
+                setTextColor(Color.parseColor("#2B2B3A"))
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, 15f)
+                val h = dp(12f).toInt(); setPadding(h, h, h * 2, h)
+                minHeight = dp(48f).toInt()
+                gravity = Gravity.CENTER_VERTICAL
+                setOnClickListener { closeOrbMenu(); act() }
+            })
+        }
+        val mlp = WindowManager.LayoutParams(
+            WindowManager.LayoutParams.WRAP_CONTENT, WindowManager.LayoutParams.WRAP_CONTENT,
+            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH,
+            PixelFormat.TRANSLUCENT
+        ).apply {
+            gravity = Gravity.TOP or (if (orbRight) Gravity.END else Gravity.START)
+            x = orbSize(); y = lp.y
+        }
+        box.setOnTouchListener { _, ev ->
+            if (ev.actionMasked == MotionEvent.ACTION_OUTSIDE) { closeOrbMenu(); true } else false
+        }
+        runCatching { wm.addView(box, mlp) }.onSuccess { orbMenu = box }
+        handler.postDelayed({ closeOrbMenu() }, 8_000)
+    }
+
+    private fun closeOrbMenu() {
+        orbMenu?.let { runCatching { wm.removeView(it) } }
+        orbMenu = null
+    }
+
+    /** Sembunyikan pet & orb total selama `ms`; rules & batas app tetap jalan. */
+    private fun hideFor(ms: Long) {
+        hiddenUntil = System.currentTimeMillis() + ms
+        hideBubble.run()
+        root.visibility = View.GONE
+        handler.postDelayed({
+            if (System.currentTimeMillis() >= hiddenUntil) root.visibility = View.VISIBLE
+        }, ms)
+        PetLog.add(this, "aksi", "🙈 disembunyikan ${ms / 60_000} menit")
     }
 
     private fun closeChat() {
@@ -733,7 +962,7 @@ class PetOverlayService : Service() {
 
     private val walkLoop = object : Runnable {
         override fun run() {
-            if (!screenOn) { // layar mati → jangan render/gerak (hemat baterai)
+            if (!screenOn || orbMode) { // layar mati / orb → jangan render/gerak (hemat baterai)
                 handler.postDelayed(this, 1_000)
                 return
             }
@@ -828,7 +1057,7 @@ class PetOverlayService : Service() {
     private val musicLoop = object : Runnable {
         override fun run() {
             val am = getSystemService(Context.AUDIO_SERVICE) as android.media.AudioManager
-            val want = musicDance && screenOn && am.isMusicActive
+            val want = musicDance && screenOn && !orbMode && am.isMusicActive
             if (want && visualizer == null) startVisualizer()
             else if (!want && visualizer != null) stopVisualizer()
             handler.postDelayed(this, 2_000)
@@ -870,6 +1099,7 @@ class PetOverlayService : Service() {
             val clean = "Pesan dari $title. $text".filter { it.code < 0x2190 }.take(300)
             tts?.speak(clean, TextToSpeech.QUEUE_ADD, null, "drive-${System.nanoTime()}")
         }
+        if (CHAT_APPS.any { pkg.startsWith(it) }) handler.post { glow(GLOW_BLUE) } // chat = penting
         val data = JSONObject().put("package", pkg).put("title", title).put("text", text)
         sendToBrain("notification", data)
     }
@@ -888,7 +1118,7 @@ class PetOverlayService : Service() {
     /** Sembunyikan pet+gelembung sesaat agar tidak ikut tertangkap screenshot. */
     fun setOverlayHidden(hidden: Boolean) = handler.post {
         val v = if (hidden) View.INVISIBLE else View.VISIBLE
-        root.visibility = v
+        root.visibility = if (System.currentTimeMillis() < hiddenUntil) View.GONE else v
         if (bubbleShown) bubble.visibility = v
     }
 
@@ -967,6 +1197,10 @@ class PetOverlayService : Service() {
             if (type == "chat" || type == "vision") Mood.note(this, emo)
         }
         val text = reply.optString("say", "")
+        if (orbMode && type == "notification") { // orb: cukup glow, jangan mekar
+            if (text.isNotEmpty()) PetLog.add(this, "pet", text)
+            return
+        }
         if (text.isNotEmpty()) {
             PetLog.add(this, "pet", text)
             // kalau teks sudah tampil lewat streaming → finalkan tanpa animasi ulang
@@ -1138,6 +1372,8 @@ class PetOverlayService : Service() {
     }
 
     private fun say(text: String, emotion: PetView.Emotion?, typewriter: Boolean = false) {
+        if (System.currentTimeMillis() < hiddenUntil) return // disembunyikan pemilik
+        if (orbMode) expandFromOrb()
         lastActivityAt = System.currentTimeMillis()
         emotion?.let { pet.emotion = it }
         handler.removeCallbacks(typeRunnable)

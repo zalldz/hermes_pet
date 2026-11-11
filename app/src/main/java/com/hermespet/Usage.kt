@@ -92,6 +92,13 @@ object Usage {
         return used.takeIf { it >= lim }
     }
 
+    /** Sisa menit sebelum batas `pkg` habis (null = tak dibatasi/izin belum ada). */
+    fun remaining(ctx: Context, pkg: String): Int? {
+        val lim = limits(ctx).optInt(pkg, 0)
+        if (lim <= 0 || !granted(ctx)) return null
+        return lim - (todayMinutes(ctx)[pkg] ?: 0)
+    }
+
     /** Aplikasi di depan: dari aksesibilitas, atau event UsageStats 3 jam terakhir. */
     fun foreground(ctx: Context): String? {
         PetAccessibilityService.currentPkg.takeIf { it.isNotEmpty() }?.let { return it }

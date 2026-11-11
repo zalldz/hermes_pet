@@ -67,9 +67,6 @@ class PetView(context: Context) : View(context) {
         else -> intArrayOf(0xFF4FC3F7.toInt(), 0xFFBEEBFF.toInt(), 0xFF2A9BD4.toInt(), 0xFF15577A.toInt())          // biru netral
     }
 
-    /** Warna badan untuk emosi sekarang (dipakai pill mode). */
-    fun bodyColor(): Int = palette(emotion)[0]
-
     // warna saat ini (di-lerp menuju target tiap frame) → transisi mulus
     private val cur = palette(Emotion.NEUTRAL).copyOf()
 
