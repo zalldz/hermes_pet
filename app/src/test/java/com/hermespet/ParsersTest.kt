@@ -46,4 +46,19 @@ class ParsersTest {
     @Test fun partialSay_noneReturnsNull() {
         assertNull(Parsers.extractPartialSay("{}"))
     }
+
+    @Test fun normalizeAction_aliases() {
+        val r = Parsers.extractJson("""{"say":"ok","actions":[{"type":"back"},{"tool":"tap_text","text":"Budi"}]}""")!!
+        val a = r.optJSONArray("actions")!!
+        assertEquals("press", a.getJSONObject(0).optString("type"))
+        assertEquals("back", a.getJSONObject(0).optString("key"))
+        assertEquals("find_and_tap", a.getJSONObject(1).optString("type"))
+        assertEquals("Budi", a.getJSONObject(1).optString("label"))
+    }
+
+    @Test fun riskyLabel() {
+        org.junit.Assert.assertTrue(Parsers.isRiskyLabel("Kirim"))
+        org.junit.Assert.assertTrue(Parsers.isRiskyLabel("Send message"))
+        org.junit.Assert.assertFalse(Parsers.isRiskyLabel("Budi Santoso"))
+    }
 }

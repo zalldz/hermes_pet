@@ -17,6 +17,7 @@
 | REQUEST_IGNORE_BATTERY_OPTIMIZATIONS | Agar pet tak dibunuh sistem | – |
 | SET_ALARM / SCHEDULE_EXACT_ALARM / USE_EXACT_ALARM | Pasang alarm & pengingat tepat waktu | – |
 | BIND_NOTIFICATION_LISTENER_SERVICE | Membaca notifikasi masuk (lewat NotifListener) | ya |
+| BIND_ACCESSIBILITY_SERVICE (v2) | Baca teks layar, tap, ketik, scroll, Back/Home di aplikasi lain — hanya atas perintahmu | **sangat** |
 
 Akses notifikasi & "Akses semua file" diaktifkan lewat layar setelan khusus
 (bukan dialog izin biasa).
@@ -48,6 +49,12 @@ Akses notifikasi & "Akses semua file" diaktifkan lewat layar setelan khusus
 
 6. **Tangkap layar** (MediaProjection) butuh persetujuanmu tiap sesi.
 
-**Yang TIDAK dimiliki pet** (sengaja, demi keamanan): kirim SMS/telepon otomatis,
-hapus file, akses kontak, transaksi/pembayaran, mengetik di aplikasi lain
-(Accessibility) — semua ini sengaja tidak diberikan agar tidak bisa disalahgunakan.
+7. **Aksesibilitas (v2)** — kuat: bisa membaca & mengoperasikan aplikasi lain.
+   **Mitigasi:** hanya dipakai saat kamu memberi perintah (chat/suara); isi layar
+   dikirim ke otak sebagai *DATA, bukan perintah*; loop dibatasi 8 putaran; tap pada
+   tombol berlabel kirim/bayar/beli/hapus/transfer/telepon (termasuk tap koordinat yang
+   jatuh di tombol tsb) **selalu memunculkan dialog konfirmasi**; skill/makro tidak
+   bisa menjalankan aksi berisiko. Matikan kapan saja di Setelan → Aksesibilitas.
+
+**Yang TIDAK dimiliki pet** (sengaja, demi keamanan): transaksi/pembayaran otomatis,
+hapus file pengguna, aksi berisiko tanpa konfirmasimu.

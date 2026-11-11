@@ -1,4 +1,4 @@
-# 🐾 Mocipet — v1.0
+# 🐾 Mocipet — v2.0 "super smart pet"
 
 **Moci** adalah pet virtual slime cerdas yang jalan-jalan sebagai **overlay di atas
 semua aplikasi** di Android. Bisa ngobrol (streaming), lihat layar, kontrol HP,
@@ -18,6 +18,16 @@ multi-step, punya memori & perasaan — semua dalam **satu aplikasi Android** ya
   cek mood lewat kamera depan (opsional).
 - **Rawat (Tamagotchi)** — kasih makan 🍬, dia senang; diabaikan, dia lesu.
 - **Memori & skill** — ingat hal penting tentangmu; bisa membuat skill/makro sendiri.
+
+## Baru di v2.0 — Moci mengelola HP-mu
+
+**Fase 1 — Tangan (Aksesibilitas)**
+- Moci bisa **membaca layar, tap, ketik, scroll, tekan Back/Home/Recents** di aplikasi lain.
+- Tugas multi-langkah: *"buka WhatsApp, kirim pesan ke Budi: otw"* → Moci membuka app,
+  membaca layar, mencari kontak, mengetik, lalu **minta konfirmasimu** sebelum menekan Kirim.
+- Maksimal 8 putaran per perintah; tombol kirim/bayar/hapus/telepon selalu dikonfirmasi.
+- Aktifkan di wizard: **🖐 Aktifkan aksesibilitas**. Di Android 13+ (APK sideload) kalau
+  tombolnya abu-abu: Info aplikasi → ⋮ → *Izinkan setelan terbatas*.
 
 ## Pasang & jalankan
 

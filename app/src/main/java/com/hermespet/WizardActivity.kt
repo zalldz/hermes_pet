@@ -48,6 +48,25 @@ class WizardActivity : Activity() {
         col.addView(button("✨ Berikan semua izin sekaligus") { grantAll() })
         col.addView(hint("Pet butuh tampil di atas aplikasi & beberapa izin. Tombol ini " +
             "memandumu satu per satu."))
+        col.addView(button("🖐 Aktifkan aksesibilitas (Moci bisa tap & ketik)") {
+            runCatching { startActivity(Permissions.accessibilityIntent()) }
+            toast("Pilih \"Mocipet — tangan Moci\" lalu aktifkan")
+        })
+        col.addView(hint("Supaya Moci bisa membaca layar & mengoperasikan aplikasi lain atas " +
+            "perintahmu. Kalau tombolnya abu-abu (Android 13+, APK sideload): buka Info " +
+            "aplikasi Mocipet → menu ⋮ → \"Izinkan setelan terbatas\", lalu ulangi."))
+        if (Permissions.isXiaomi()) {
+            col.addView(step("📱 Khusus Xiaomi/Redmi/POCO"))
+            Permissions.miuiIntents(this).forEach { (label, intent) ->
+                col.addView(button("⚙️ $label") {
+                    runCatching { startActivity(intent) }
+                        .onFailure { open("package:$packageName") }
+                })
+            }
+            col.addView(hint("MIUI suka mematikan aplikasi di latar. Nyalakan Autostart, izin " +
+                "\"Tampilkan jendela pop-up saat berjalan di latar\", dan set Penghemat " +
+                "baterai → Tanpa batasan."))
+        }
 
         // --- Langkah 2: hubungkan AI ---
         col.addView(step("2️⃣  Hubungkan otak AI"))
@@ -133,8 +152,11 @@ class WizardActivity : Activity() {
         status.text = if (notGreen == 0) "✅ Semua izin siap" else "⚠️ $notGreen izin belum aktif"
     }
 
-    private fun open(url: String) =
-        runCatching { startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) }.let {}
+    private fun open(url: String) = runCatching {
+        startActivity(if (url.startsWith("package:"))
+            Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse(url))
+        else Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+    }.let {}
 
     private fun toast(m: String) = Toast.makeText(this, m, Toast.LENGTH_SHORT).show()
 

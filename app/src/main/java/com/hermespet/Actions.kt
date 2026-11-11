@@ -58,10 +58,48 @@ object Actions {
                 action.optJSONArray("steps") ?: org.json.JSONArray())
             "use_skill" -> Skills.run(ctx, action.optString("name"))
             "delete_skill" -> Skills.delete(ctx, action.optString("name"))
+            "screen_read", "screen_tap", "screen_type", "screen_scroll", "press",
+            "find_and_tap" -> screen(action)
             else -> null
         }
     } catch (e: Exception) {
         "Aduh, gagal: ${e.message} 😖"
+    }
+
+    /** Aksi yang hasilnya dikirim balik ke otak (loop agent), bukan sekadar diucapkan. */
+    val OBSERVE = setOf("screen_read")
+
+    /** Aksi yang mengubah layar → beri jeda lebih lama sebelum langkah berikutnya. */
+    val SLOW = setOf("open_app", "screen_tap", "find_and_tap", "press", "screen_scroll", "screen_type")
+
+    /**
+     * Teks pertanyaan konfirmasi kalau aksi berisiko (kirim/bayar/hapus/telepon), atau
+     * null kalau aman dijalankan langsung. Tap koordinat dicek label elemen di titik itu
+     * supaya model tidak bisa "mengakali" konfirmasi lewat koordinat.
+     */
+    fun confirmPrompt(action: JSONObject): String? = when (action.optString("type")) {
+        "find_and_tap" -> action.optString("label").takeIf { Parsers.isRiskyLabel(it) }
+            ?.let { "Moci mau menekan \"$it\". Lanjut?" }
+        "screen_tap" -> PetAccessibilityService.instance
+            ?.labelAt(action.optInt("x"), action.optInt("y"))
+            ?.takeIf { Parsers.isRiskyLabel(it) }
+            ?.let { "Moci mau menekan \"$it\". Lanjut?" }
+        else -> null
+    }
+
+    // ------------------------------------------------------------- layar (aksesibilitas)
+
+    private fun screen(a: JSONObject): String {
+        val s = PetAccessibilityService.instance
+            ?: return "Aktifkan dulu Aksesibilitas \"Mocipet\" di Setelan → Aksesibilitas ya 🙏"
+        return when (a.optString("type")) {
+            "screen_read" -> s.screenText()
+            "screen_tap" -> s.tap(a.optInt("x"), a.optInt("y"))
+            "screen_type" -> s.type(a.optString("text"))
+            "screen_scroll" -> s.scroll(a.optString("dir", "down") != "up")
+            "press" -> s.press(a.optString("key", "back"))
+            else -> s.findAndTap(a.optString("label"))
+        }
     }
 
     // ------------------------------------------------------------- volume

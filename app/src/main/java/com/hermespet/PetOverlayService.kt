@@ -834,9 +834,18 @@ class PetOverlayService : Service() {
 
     private var streamingText = ""
 
+    // --- loop agent (v2): tugas multi-langkah di aplikasi lain lewat aksesibilitas ---
+    private var agentTask = ""
+    private var agentStep = 0
+    private val agentDone = StringBuilder()
+    private val MAX_AGENT_STEPS = 8
+
     private fun sendToBrain(type: String, data: JSONObject) {
         // interaksi langsung memperbarui "kapan terakhir disapa" (anti-kesepian)
         if (type == "chat" || type == "poke") { Mood.noteInteraction(this); Care.cheer(this) }
+        if (type == "chat") { // perintah baru pemilik = tugas agent baru
+            agentTask = data.optString("text"); agentStep = 0; agentDone.setLength(0)
+        }
         // streaming hanya untuk chat (jawaban mengalir real-time)
         val onStream: ((String) -> Unit)? = if (type == "chat") { s -> streamSay(s) } else null
         Brain.sendEvent(this, type, data, onStream) { reply -> applyReply(type, reply) }
@@ -888,7 +897,8 @@ class PetOverlayService : Service() {
         // KEAMANAN: aksi nyata HANYA dijalankan dari perintah langsung pemilik
         // (chat/suara/lihat-layar). Notifikasi/tick/sapaan TIDAK boleh memicu aksi —
         // mencegah prompt-injection dari konten luar ("boomerang").
-        val actionAllowed = type == "chat" || type == "vision"
+        // "agent" = putaran lanjutan dari tugas yang dimulai pemilik lewat chat
+        val actionAllowed = type == "chat" || type == "vision" || type == "agent"
         if (!actionAllowed) return
         // multi-step: kumpulkan aksi tunggal ("action") + daftar ("actions")
         val queue = ArrayList<JSONObject>()
@@ -899,21 +909,80 @@ class PetOverlayService : Service() {
         if (queue.isNotEmpty()) runActionQueue(queue, sayFeedback = text.isEmpty())
     }
 
-    /** Jalankan rangkaian aksi (agentic) berurutan dengan jeda agar enak diikuti. */
-    private fun runActionQueue(queue: List<JSONObject>, sayFeedback: Boolean, i: Int = 0) {
-        if (i >= queue.size) return
+    /**
+     * Jalankan rangkaian aksi (agentic) berurutan dengan jeda agar enak diikuti.
+     * Aksi berisiko menunggu konfirmasi pemilik; hasil aksi pengamatan (screen_read)
+     * dikumpulkan lalu dikirim balik ke otak untuk putaran berikutnya.
+     */
+    private fun runActionQueue(
+        queue: List<JSONObject>, sayFeedback: Boolean, i: Int = 0,
+        observed: StringBuilder = StringBuilder()
+    ) {
+        if (i >= queue.size) { continueAgent(observed.toString()); return }
         val act = queue[i]
-        val delay = if (act.optString("type") == "location") {
+        val type = act.optString("type")
+        val ask = Actions.confirmPrompt(act)
+        if (ask != null && !act.optBoolean("_ok")) {
+            confirm(ask) { ok ->
+                if (ok) { act.put("_ok", true); runActionQueue(queue, sayFeedback, i, observed) }
+                else {
+                    PetLog.add(this, "aksi", "❌ dibatalkan pemilik: $ask")
+                    say("Oke, nggak jadi 👌", PetView.Emotion.NEUTRAL)
+                    agentStep = MAX_AGENT_STEPS // hentikan loop agent
+                }
+            }
+            return
+        }
+        val delay = if (type == "location") {
             fetchLocation(); 1200L
         } else {
             val feedback = Actions.run(this, act)
+            agentDone.append(type).append(act.optString("label", act.optString("name", ""))
+                .let { if (it.isEmpty()) "" else "($it)" }).append(", ")
             if (!feedback.isNullOrEmpty()) {
-                PetLog.add(this, "aksi", feedback)
-                if (sayFeedback) { say(feedback, null, typewriter = true); speak(feedback) }
+                if (type in Actions.OBSERVE) {
+                    observed.append("[").append(type).append("]\n").append(feedback).append('\n')
+                    PetLog.add(this, "aksi", "👀 $type (${feedback.length} huruf)")
+                } else {
+                    PetLog.add(this, "aksi", feedback)
+                    if (sayFeedback) { say(feedback, null, typewriter = true); speak(feedback) }
+                }
             }
-            700L
+            if (type in Actions.SLOW) 1500L else 700L
         }
-        if (i + 1 < queue.size) handler.postDelayed({ runActionQueue(queue, sayFeedback, i + 1) }, delay)
+        handler.postDelayed({ runActionQueue(queue, sayFeedback, i + 1, observed) },
+            if (i + 1 < queue.size) delay else 0L)
+    }
+
+    /** Kirim hasil pengamatan ke otak untuk langkah berikutnya (dibatasi MAX_AGENT_STEPS). */
+    private fun continueAgent(observed: String) {
+        if (observed.isEmpty() || agentTask.isEmpty()) return
+        if (++agentStep > MAX_AGENT_STEPS) {
+            say("Udah $MAX_AGENT_STEPS langkah, aku berhenti dulu ya 🥵", PetView.Emotion.SLEEPY)
+            return
+        }
+        say("🤔 (langkah $agentStep)...", null)
+        sendToBrain("agent", JSONObject()
+            .put("task", agentTask).put("step", agentStep)
+            .put("done", agentDone.toString().takeLast(600))
+            .put("observed", observed))
+    }
+
+    /** Dialog konfirmasi di atas aplikasi lain (butuh izin overlay yang sudah ada). */
+    private fun confirm(msg: String, onResult: (Boolean) -> Unit) {
+        var answered = false
+        fun answer(ok: Boolean) { if (!answered) { answered = true; onResult(ok) } }
+        val d = android.app.AlertDialog.Builder(
+            android.view.ContextThemeWrapper(this, android.R.style.Theme_Material_Light_Dialog_Alert))
+            .setTitle("Moci minta izin 🐾")
+            .setMessage(msg)
+            .setPositiveButton("Ya, lanjut") { _, _ -> answer(true) }
+            .setNegativeButton("Batal") { _, _ -> answer(false) }
+            .setOnDismissListener { answer(false) }
+            .create()
+        d.window?.setType(WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY)
+        d.show()
+        say("❓ $msg", PetView.Emotion.SURPRISED)
     }
 
     /** Cek lokasi aktif (GPS/fused) lalu laporkan + perbarui lat/lon untuk cuaca. */

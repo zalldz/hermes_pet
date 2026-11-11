@@ -65,7 +65,9 @@ object Skills {
         val results = mutableListOf<String>()
         for (i in 0 until steps.length()) {
             steps.optJSONObject(i)?.let { step ->
-                Actions.run(ctx, step)?.let { results.add(it) }
+                // skill berjalan tanpa dialog → aksi berisiko (kirim/bayar/hapus) dilewati
+                if (Actions.confirmPrompt(step) != null) results.add("⚠️ aksi berisiko dilewati")
+                else Actions.run(ctx, step)?.let { results.add(it) }
             }
         }
         return "Skill \"$name\" kujalankan: " + results.joinToString(" · ").ifBlank { "beres ✓" }

@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="a11y_label">Mocipet — tangan Moci</string>
+    <string name="a11y_desc">Memungkinkan Moci membaca teks layar, tap, ketik, dan scroll di aplikasi lain — HANYA saat kamu memintanya lewat chat/suara. Aksi kirim/bayar/hapus selalu minta konfirmasimu dulu.</string>
+</resources>

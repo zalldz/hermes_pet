@@ -44,6 +44,30 @@ object Permissions {
         return flat.split(":").any { ComponentName.unflattenFromString(it) == cn }
     }
 
+    /** Aksesibilitas Mocipet aktif (v2: baca layar, tap, ketik di aplikasi lain)? */
+    fun accessibility(ctx: Context): Boolean {
+        val flat = Settings.Secure.getString(ctx.contentResolver,
+            Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES) ?: return false
+        val cn = ComponentName(ctx, PetAccessibilityService::class.java)
+        return flat.split(":").any { ComponentName.unflattenFromString(it) == cn }
+    }
+
+    fun accessibilityIntent() = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
+
+    fun isXiaomi() = Build.MANUFACTURER.lowercase().let {
+        it.contains("xiaomi") || it.contains("redmi") || it.contains("poco")
+    }
+
+    /** MIUI/HyperOS: layar Autostart & "tampilkan pop-up saat di latar" (bisa tidak ada di ROM lain). */
+    fun miuiIntents(ctx: Context): List<Pair<String, Intent>> = listOf(
+        "Autostart (MIUI)" to Intent().setComponent(ComponentName("com.miui.securitycenter",
+            "com.miui.permcenter.autostart.AutoStartManagementActivity")),
+        "Izin lain: pop-up di latar (MIUI)" to Intent("miui.intent.action.APP_PERM_EDITOR")
+            .setClassName("com.miui.securitycenter",
+                "com.miui.permcenter.permissions.PermissionsEditorActivity")
+            .putExtra("extra_pkgname", ctx.packageName),
+    )
+
     fun writeSettings(ctx: Context) = Settings.System.canWrite(ctx)
 
     fun dnd(ctx: Context) =
@@ -65,6 +89,7 @@ object Permissions {
     fun status(ctx: Context): List<Perm> = listOf(
         Perm("Overlay (tampil di atas app)", overlay(ctx), essential = true),
         Perm("Baca notifikasi", notifListener(ctx), essential = false),
+        Perm("Aksesibilitas (baca layar, tap, ketik)", accessibility(ctx), false),
         Perm("Kamera (cek mood)", has(ctx, Manifest.permission.CAMERA), false),
         Perm("Mikrofon (perintah suara)", has(ctx, Manifest.permission.RECORD_AUDIO), false),
         Perm("Lokasi (cuaca otomatis)", has(ctx, Manifest.permission.ACCESS_COARSE_LOCATION), false),
@@ -97,6 +122,8 @@ object Permissions {
             Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, pkg))
         if (!notifListener(ctx)) add("Baca notifikasi" to
             Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
+        if (!accessibility(ctx)) add("Aksesibilitas: aktifkan \"Mocipet — tangan Moci\"" to
+            accessibilityIntent())
         if (!writeSettings(ctx)) add("Ubah setelan sistem" to
             Intent(Settings.ACTION_MANAGE_WRITE_SETTINGS, pkg))
         if (!dnd(ctx)) add("Jangan Ganggu" to
