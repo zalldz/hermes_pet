@@ -37,6 +37,19 @@ multi-step, punya memori & perasaan — semua dalam **satu aplikasi Android** ya
 - Atur lama diamnya di Pengaturan → Pet (0 = tidak pernah jadi pill). Satu window yang
   di-resize; di luar badan slime/pill sentuhan tembus ke aplikasi di bawahnya.
 
+**Fase 3 — Otomasi & screen time**
+- **Rules "kalau → maka"**: jam/hari, sambung/putus WiFi (SSID), baterai < X% / penuh,
+  masuk/keluar radius lokasi, aplikasi tertentu dibuka → DND, senyap, hemat baterai,
+  kecerahan, buka app, notif dari Moci, atau perintah ke otak. Cukup bilang ke Moci:
+  *"tiap nyambung WiFi Rumah, matikan senyap"* (Moci minta konfirmasi sebelum memasang).
+- Bawaan: **23:00 → DND**, **baterai < 20% → hemat baterai**. Lihat/hapus di 🧠 Kelola.
+- **Screen time**: *"berapa lama aku main HP hari ini?"* (`usage_report`).
+- **Batas app**: *"batasi TikTok 60 menit"* → saat habis muncul layar *"Moci nahan kamu…"*
+  dengan tombol tutup / 15 menit lagi.
+- Hemat baterai hanya bisa di-toggle langsung kalau diberi izin sekali lewat PC:
+  `adb shell pm grant com.hermespet android.permission.WRITE_SECURE_SETTINGS`
+  (tanpa itu Moci membukakan setelannya). Trigger WiFi butuh izin lokasi aktif.
+
 ## Pasang & jalankan
 
 1. **Build APK** lewat GitHub Actions (tab Actions → unduh artifact `hermespet-debug-apk`),

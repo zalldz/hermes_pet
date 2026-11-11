@@ -90,6 +90,7 @@ object Permissions {
         Perm("Overlay (tampil di atas app)", overlay(ctx), essential = true),
         Perm("Baca notifikasi", notifListener(ctx), essential = false),
         Perm("Aksesibilitas (baca layar, tap, ketik)", accessibility(ctx), false),
+        Perm("Data penggunaan (screen time & batas app)", Usage.granted(ctx), false),
         Perm("Kamera (cek mood)", has(ctx, Manifest.permission.CAMERA), false),
         Perm("Mikrofon (perintah suara)", has(ctx, Manifest.permission.RECORD_AUDIO), false),
         Perm("Lokasi (cuaca otomatis)", has(ctx, Manifest.permission.ACCESS_COARSE_LOCATION), false),
@@ -124,6 +125,7 @@ object Permissions {
             Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
         if (!accessibility(ctx)) add("Aksesibilitas: aktifkan \"Mocipet — tangan Moci\"" to
             accessibilityIntent())
+        if (!Usage.granted(ctx)) add("Akses data penggunaan" to Usage.settingsIntent())
         if (!writeSettings(ctx)) add("Ubah setelan sistem" to
             Intent(Settings.ACTION_MANAGE_WRITE_SETTINGS, pkg))
         if (!dnd(ctx)) add("Jangan Ganggu" to

@@ -41,6 +41,14 @@ class ManagerActivity : Activity() {
             })
         }
 
+        // --- otomasi (v2) ---
+        col.addView(header("⚙️ Otomasi (kalau → maka)"))
+        val rules = Rules.list(this)
+        if (rules.isEmpty()) col.addView(muted("(belum ada — minta pet: \"tiap jam 22 nyalakan DND\")"))
+        rules.forEach { r ->
+            col.addView(row(Rules.describe(r)) { Rules.delete(this, r.optString("name")); render() })
+        }
+
         // --- memori ---
         col.addView(header("🧠 Ingatan jangka panjang"))
         val fmt = SimpleDateFormat("dd/MM/yy", Locale.getDefault())

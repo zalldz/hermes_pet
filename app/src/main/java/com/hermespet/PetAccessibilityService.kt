@@ -17,6 +17,8 @@ class PetAccessibilityService : AccessibilityService() {
 
     companion object {
         @Volatile var instance: PetAccessibilityService? = null
+        /** Paket aplikasi yang sedang tampil (untuk otomasi "app dibuka" & batas waktu). */
+        @Volatile var currentPkg: String = ""
         private const val MAX_TEXT = 3500
     }
 
@@ -29,7 +31,18 @@ class PetAccessibilityService : AccessibilityService() {
 
     override fun onInterrupt() {}
 
-    override fun onAccessibilityEvent(e: AccessibilityEvent) {}
+    override fun onAccessibilityEvent(e: AccessibilityEvent) {
+        if (e.eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
+            val pkg = e.packageName?.toString() ?: return
+            // abaikan diri sendiri, status bar & keyboard (bukan "aplikasi dibuka")
+            if (pkg == packageName || pkg == "com.android.systemui" ||
+                pkg.contains("inputmethod") || pkg.contains("keyboard")) return
+            if (pkg != currentPkg) {
+                currentPkg = pkg
+                PetOverlayService.instance?.onAppChanged(pkg)
+            }
+        }
+    }
 
     /** Semua teks yang terlihat di layar aktif. Tombol/isian diberi tag + titik tengah (x,y). */
     fun screenText(): String {

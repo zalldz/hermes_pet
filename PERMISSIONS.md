@@ -17,6 +17,9 @@
 | REQUEST_IGNORE_BATTERY_OPTIMIZATIONS | Agar pet tak dibunuh sistem | – |
 | SET_ALARM / SCHEDULE_EXACT_ALARM / USE_EXACT_ALARM | Pasang alarm & pengingat tepat waktu | – |
 | BIND_NOTIFICATION_LISTENER_SERVICE | Membaca notifikasi masuk (lewat NotifListener) | ya |
+| PACKAGE_USAGE_STATS (v2) | Screen time per app & batas waktu app (akses khusus "Data penggunaan") | ya |
+| ACCESS_WIFI_STATE (v2) | Trigger otomasi saat sambung/putus WiFi tertentu (SSID; butuh izin lokasi) | – |
+| WRITE_SECURE_SETTINGS (v2, opsional) | Hemat baterai on/off oleh otomasi — hanya aktif kalau kamu beri lewat `adb pm grant` | sedang |
 | BIND_ACCESSIBILITY_SERVICE (v2) | Baca teks layar, tap, ketik, scroll, Back/Home di aplikasi lain — hanya atas perintahmu | **sangat** |
 
 Akses notifikasi & "Akses semua file" diaktifkan lewat layar setelan khusus
@@ -55,6 +58,9 @@ Akses notifikasi & "Akses semua file" diaktifkan lewat layar setelan khusus
    tombol berlabel kirim/bayar/beli/hapus/transfer/telepon (termasuk tap koordinat yang
    jatuh di tombol tsb) **selalu memunculkan dialog konfirmasi**; skill/makro tidak
    bisa menjalankan aksi berisiko. Matikan kapan saja di Setelan → Aksesibilitas.
+
+8. **Otomasi (v2)** — rule berjalan tanpa kamu sentuh, jadi **memasang rule lewat
+   Moci selalu minta konfirmasi** (dialog). Rule bisa dilihat & dihapus di 🧠 Kelola.
 
 **Yang TIDAK dimiliki pet** (sengaja, demi keamanan): transaksi/pembayaran otomatis,
 hapus file pengguna, aksi berisiko tanpa konfirmasimu.

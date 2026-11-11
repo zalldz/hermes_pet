@@ -60,6 +60,14 @@ object Actions {
             "delete_skill" -> Skills.delete(ctx, action.optString("name"))
             "screen_read", "screen_tap", "screen_type", "screen_scroll", "press",
             "find_and_tap" -> screen(action)
+            // --- v2 fase 3: otomasi & screen time ---
+            "silent" -> silent(ctx, action.optBoolean("on", true))
+            "battery_saver" -> batterySaver(ctx, action.optBoolean("on", true))
+            "usage_report" -> Usage.report(ctx)
+            "set_app_limit" -> Usage.setLimit(ctx, action.optString("app"), action.optInt("minutes", 60))
+            "add_rule" -> addRule(ctx, action)
+            "delete_rule" -> Rules.delete(ctx, action.optString("name"))
+            "list_rules" -> Rules.listText(ctx)
             else -> null
         }
     } catch (e: Exception) {
@@ -67,7 +75,7 @@ object Actions {
     }
 
     /** Aksi yang hasilnya dikirim balik ke otak (loop agent), bukan sekadar diucapkan. */
-    val OBSERVE = setOf("screen_read")
+    val OBSERVE = setOf("screen_read", "usage_report", "list_rules")
 
     /** Aksi yang mengubah layar → beri jeda lebih lama sebelum langkah berikutnya. */
     val SLOW = setOf("open_app", "screen_tap", "find_and_tap", "press", "screen_scroll", "screen_type")
@@ -84,7 +92,43 @@ object Actions {
             ?.labelAt(action.optInt("x"), action.optInt("y"))
             ?.takeIf { Parsers.isRiskyLabel(it) }
             ?.let { "Moci mau menekan \"$it\". Lanjut?" }
+        "add_rule" -> "Moci mau memasang otomasi \"${action.optString("name")}\": kalau " +
+            "${action.optJSONObject("trigger")} → ${action.optJSONObject("then")}. Lanjut?"
         else -> null
+    }
+
+    // ------------------------------------------------------------- otomasi
+
+    private fun addRule(ctx: Context, a: JSONObject): String {
+        val trigger = a.optJSONObject("trigger")
+        // app_open boleh pakai nama aplikasi → simpan sebagai nama paket
+        if (trigger?.optString("type") == "app_open" && !trigger.has("package")) {
+            val pkg = findPackage(ctx, trigger.optString("app"))
+                ?: return "Aku nggak nemu aplikasi \"${trigger.optString("app")}\" 😞"
+            trigger.put("package", pkg)
+        }
+        return Rules.add(ctx, a.optString("name"), trigger, a.optJSONObject("then"))
+    }
+
+    private fun silent(ctx: Context, on: Boolean): String = try {
+        audio(ctx).ringerMode = if (on) AudioManager.RINGER_MODE_SILENT else AudioManager.RINGER_MODE_NORMAL
+        if (on) "Mode senyap nyala 🔕" else "Mode senyap mati 🔔"
+    } catch (e: SecurityException) {
+        dnd(ctx, on) // butuh akses DND; minta lewat halaman yang sama
+    }
+
+    /**
+     * Hemat baterai hanya bisa di-toggle aplikasi yang punya WRITE_SECURE_SETTINGS
+     * (beri sekali lewat adb, lihat README). Tanpa itu: bukakan setelannya.
+     */
+    private fun batterySaver(ctx: Context, on: Boolean): String {
+        if (ctx.checkSelfPermission("android.permission.WRITE_SECURE_SETTINGS") ==
+            android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            Settings.Global.putInt(ctx.contentResolver, "low_power", if (on) 1 else 0)
+            return if (on) "Hemat baterai nyala 🔋" else "Hemat baterai mati ⚡"
+        }
+        openSettings(ctx, Settings.ACTION_BATTERY_SAVER_SETTINGS, "")
+        return "Kubukakan setelan hemat baterai 🔋 (Android melarangku menyalakannya langsung)"
     }
 
     // ------------------------------------------------------------- layar (aksesibilitas)
@@ -165,6 +209,21 @@ object Actions {
     }
 
     // ------------------------------------------------------------- aplikasi & panel
+
+    /** Nama paket aplikasi yang bisa diluncurkan dengan label paling cocok, atau null. */
+    fun findPackage(ctx: Context, name: String): String? {
+        if (name.isBlank()) return null
+        val pm = ctx.packageManager
+        val launchables = pm.queryIntentActivities(
+            Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER), 0)
+        val q = name.lowercase().trim()
+        fun lbl(r: android.content.pm.ResolveInfo) = r.loadLabel(pm).toString().lowercase()
+        return (launchables.firstOrNull { lbl(it) == q }
+            ?: launchables.firstOrNull { lbl(it).startsWith(q) }
+            ?: launchables.firstOrNull { lbl(it).contains(q) }
+            ?: launchables.firstOrNull { it.activityInfo.packageName.lowercase().contains(q) })
+            ?.activityInfo?.packageName
+    }
 
     private fun openApp(ctx: Context, name: String): String {
         if (name.isBlank()) return "Aplikasi apa? 🤔"

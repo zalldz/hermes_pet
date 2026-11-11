@@ -107,7 +107,18 @@ object Brain {
             "{\"type\":\"screen_tap\",\"x\":<px>,\"y\":<px>} | " +
             "{\"type\":\"screen_type\",\"text\":\"<teks>\"} (ketik ke kolom isian aktif) | " +
             "{\"type\":\"screen_scroll\",\"dir\":\"down|up\"} | " +
-            "{\"type\":\"press\",\"key\":\"back|home|recents|notifications\"}\n" +
+            "{\"type\":\"press\",\"key\":\"back|home|recents|notifications\"} | " +
+            // --- v2: otomasi & screen time ---
+            "{\"type\":\"silent\",\"on\":true/false} (mode senyap) | " +
+            "{\"type\":\"battery_saver\",\"on\":true/false} | " +
+            "{\"type\":\"usage_report\"} (screen time per aplikasi hari ini; hasil dikirim balik ke kamu) | " +
+            "{\"type\":\"set_app_limit\",\"app\":\"<nama aplikasi>\",\"minutes\":<menit/hari, 0=hapus>} | " +
+            "{\"type\":\"add_rule\",\"name\":\"<nama>\",\"trigger\":{...},\"then\":{<satu aksi>}} " +
+            "(otomasi; trigger: time{hour,minute,days?[1=Minggu..7=Sabtu]} | wifi_connect{ssid} | " +
+            "wifi_disconnect{ssid?} | battery_below{level} | battery_full | " +
+            "geo_enter/geo_exit{lat,lon,radius meter} | app_open{app}; then: aksi apa pun, " +
+            "atau {\"type\":\"notify\",\"text\":\"..\"} / {\"type\":\"brain\",\"text\":\"<perintah untukmu>\"}) | " +
+            "{\"type\":\"list_rules\"} | {\"type\":\"delete_rule\",\"name\":\"<nama>\"}\n" +
             "MENGENDALIKAN APLIKASI LAIN: rangkai aksi lalu AKHIRI dengan screen_read — kamu " +
             "akan dipanggil lagi dengan isi layar untuk langkah berikutnya (find_and_tap, " +
             "screen_type, ...). Ulangi sampai tugas beres (maks 8 putaran), lalu laporkan " +

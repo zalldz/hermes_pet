@@ -187,6 +187,7 @@ class PetOverlayService : Service() {
         tts?.shutdown()
         runCatching { unregisterReceiver(screenReceiver) }
         closeChat()
+        hideBlocker()
         if (bubbleShown) runCatching { wm.removeView(bubble) }
         runCatching { wm.removeView(root) }
         super.onDestroy()
@@ -525,6 +526,104 @@ class PetOverlayService : Service() {
         pausedUntil = System.currentTimeMillis() + 60_000 // diam selama ngobrol
     }
 
+    // ---------------------------------------------------------------- otomasi & batas app (v2)
+
+    private var prevRuleState: Rules.State? = null
+
+    @Suppress("DEPRECATION")
+    private fun currentSsid(): String? = runCatching {
+        (applicationContext.getSystemService(Context.WIFI_SERVICE) as android.net.wifi.WifiManager)
+            .connectionInfo?.ssid?.trim('"')
+            ?.takeIf { it.isNotEmpty() && it != "<unknown ssid>" }
+    }.getOrNull()
+
+    private fun ruleState(pkg: String? = prevRuleState?.pkg): Rules.State {
+        val cal = Calendar.getInstance()
+        val bm = getSystemService(Context.BATTERY_SERVICE) as BatteryManager
+        return Rules.State(
+            cal.get(Calendar.HOUR_OF_DAY) * 60 + cal.get(Calendar.MINUTE),
+            cal.get(Calendar.DAY_OF_WEEK), currentSsid(),
+            bm.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY), bm.isCharging,
+            latitude.toDoubleOrNull(), longitude.toDoubleOrNull(), pkg)
+    }
+
+    /** Jalankan aksi dari rule yang baru menyala (rule dibuat pemilik → boleh beraksi). */
+    private fun checkRules(cur: Rules.State) {
+        val prev = prevRuleState
+        prevRuleState = cur
+        val acts = Rules.evaluate(this, prev, cur)
+        if (acts.isEmpty()) return
+        val queue = ArrayList<JSONObject>()
+        for (a in acts) when (a.optString("type")) {
+            "notify" -> { say("⚙️ ${a.optString("text")}", PetView.Emotion.SURPRISED); speak(a.optString("text")) }
+            "brain" -> sendToBrain("chat", JSONObject().put("text", a.optString("text")))
+            else -> queue.add(a)
+        }
+        PetLog.add(this, "aksi", "⚙️ otomasi: ${acts.joinToString { it.optString("type") }}")
+        if (queue.isNotEmpty()) runActionQueue(queue, sayFeedback = true)
+    }
+
+    /** Dipanggil aksesibilitas saat aplikasi di depan berganti. */
+    fun onAppChanged(pkg: String) = handler.post {
+        if (blockerView != null && pkg != blockerPkg) hideBlocker()
+        checkRules(ruleState(pkg))
+        checkLimit(pkg)
+    }
+
+    private var blockerView: View? = null
+    private var blockerPkg = ""
+
+    private fun checkLimit(pkg: String) {
+        if (blockerView != null || pkg == packageName) return
+        val used = Usage.overLimit(this, pkg) ?: return
+        showBlocker(pkg, used)
+    }
+
+    /** Layar penahan sederhana saat batas harian app habis; bisa di-override. */
+    private fun showBlocker(pkg: String, used: Int) {
+        val label = Usage.label(this, pkg)
+        fun btn(t: String, onClick: () -> Unit) = Button(this).apply {
+            text = t; isAllCaps = false
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f)
+            setOnClickListener { onClick() }
+        }
+        val box = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER
+            setBackgroundColor(Color.parseColor("#F0202030"))
+            val p = dp(28f).toInt(); setPadding(p, p, p, p)
+            addView(TextView(context).apply {
+                text = "🐾✋"; setTextSize(TypedValue.COMPLEX_UNIT_SP, 56f); gravity = Gravity.CENTER
+            })
+            addView(TextView(context).apply {
+                text = "Moci nahan kamu — $label udah $used menit hari ini."
+                setTextColor(Color.WHITE); setTextSize(TypedValue.COMPLEX_UNIT_SP, 20f)
+                gravity = Gravity.CENTER; setPadding(0, dp(12f).toInt(), 0, dp(20f).toInt())
+            })
+            addView(btn("🏠 Udahan, tutup aplikasinya") {
+                hideBlocker()
+                startActivity(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME)
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+            })
+            addView(btn("⏰ 15 menit lagi aja") { Usage.snooze(pkg, 15); hideBlocker() })
+        }
+        val blp = WindowManager.LayoutParams(
+            WindowManager.LayoutParams.MATCH_PARENT, WindowManager.LayoutParams.MATCH_PARENT,
+            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
+            PixelFormat.TRANSLUCENT)
+        runCatching { wm.addView(box, blp) }.onSuccess {
+            blockerView = box; blockerPkg = pkg
+            PetLog.add(this, "aksi", "⏳ batas $label tercapai ($used menit)")
+        }
+    }
+
+    private fun hideBlocker() {
+        blockerView?.let { runCatching { wm.removeView(it) } }
+        blockerView = null; blockerPkg = ""
+    }
+
     // ---------------------------------------------------------------- pill mode
 
     /** Cek idle tiap 5 detik: PET tanpa interaksi > pillIdleSec → menyusut jadi PILL. */
@@ -792,6 +891,8 @@ class PetOverlayService : Service() {
             val senses = Senses.snapshot(this@PetOverlayService)
             senses.keys().forEach { k -> data.put(k, senses.get(k)) }
             sendToBrain("tick", data)
+            checkRules(ruleState())
+            Usage.foreground(this@PetOverlayService)?.let { checkLimit(it) }
             handler.postDelayed(this, TICK_MS)
         }
     }

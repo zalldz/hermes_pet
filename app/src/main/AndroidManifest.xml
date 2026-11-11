@@ -29,6 +29,15 @@
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
     <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
 
+    <!-- v2 fase 3: screen time & batas app (akses khusus, diaktifkan di Setelan) -->
+    <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS"
+        tools:ignore="ProtectedPermissions" />
+    <!-- v2 fase 3: trigger otomasi WiFi (SSID) -->
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <!-- opsional: hemat baterai on/off; hanya aktif kalau diberi lewat adb (lihat README) -->
+    <uses-permission android:name="android.permission.WRITE_SECURE_SETTINGS"
+        tools:ignore="ProtectedPermissions" />
+
     <uses-feature android:name="android.hardware.camera.front" android:required="false" />
 
     <!-- agar pet bisa mencari & membuka aplikasi yang bisa diluncurkan ("buka YouTube") -->
