@@ -40,7 +40,7 @@ class ScreenCaptureService : Service() {
 
         // sembunyikan pet sebentar supaya tidak ikut tertangkap
         PetOverlayService.instance?.setOverlayHidden(true)
-        Handler(Looper.getMainLooper()).postDelayed({ capture(code, data, question) }, 120)
+        Handler(Looper.getMainLooper()).postDelayed({ capture(code, data, question) }, 600)
         return START_NOT_STICKY
     }
 
