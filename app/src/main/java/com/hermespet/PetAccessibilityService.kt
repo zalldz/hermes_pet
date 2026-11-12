@@ -2,6 +2,7 @@ package com.hermespet
 
 import android.accessibilityservice.AccessibilityService
 import android.accessibilityservice.GestureDescription
+import android.content.Intent
 import android.graphics.Path
 import android.graphics.Rect
 import android.os.Bundle
@@ -19,6 +20,8 @@ class PetAccessibilityService : AccessibilityService() {
         @Volatile var instance: PetAccessibilityService? = null
         /** Paket aplikasi yang sedang tampil (untuk otomasi "app dibuka" & batas waktu). */
         @Volatile var currentPkg: String = ""
+        /** Launcher sedang di depan (ikon jadi pijakan slime). */
+        @Volatile var onHome = false
         private const val MAX_TEXT = 3500
     }
 
@@ -31,10 +34,43 @@ class PetAccessibilityService : AccessibilityService() {
 
     override fun onInterrupt() {}
 
+    private val homePkgs: Set<String> by lazy {
+        packageManager.queryIntentActivities(
+            Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME), 0
+        ).map { it.activityInfo.packageName }.toSet()
+    }
+
+    /**
+     * Posisi ikon launcher (HANYA kotak, tanpa teks) untuk jadi pijakan slime.
+     * Sengaja di luar guard(): tidak ada isi layar yang dibaca. Launcher bukan app keuangan.
+     */
+    fun iconRects(): List<Rect> {
+        val root = rootInActiveWindow ?: return emptyList()
+        if (root.packageName?.toString() !in homePkgs) return emptyList()
+        val dm = resources.displayMetrics
+        val minPx = 24 * dm.density; val maxW = dm.widthPixels / 3
+        val out = ArrayList<Rect>()
+        fun walk(n: AccessibilityNodeInfo, depth: Int) {
+            if (depth > 14 || out.size > 80) return
+            if (n.isClickable && n.isVisibleToUser) {
+                val r = Rect(); n.getBoundsInScreen(r)
+                if (r.width() >= minPx && r.height() >= minPx && r.width() <= maxW && r.height() <= maxW) out.add(r)
+                return // anak dari tombol tidak perlu
+            }
+            for (i in 0 until n.childCount) n.getChild(i)?.let { walk(it, depth + 1) }
+        }
+        walk(root, 0)
+        return out
+    }
+
     /** Teks yang terakhir diseleksi pengguna (untuk riwayat clipboard saat "Salin" ditekan). */
     private var selected = ""
 
     override fun onAccessibilityEvent(e: AccessibilityEvent) {
+        if (e.eventType == AccessibilityEvent.TYPE_VIEW_SCROLLED) { // geser halaman → baca ulang ikon sebentar lagi
+            if (onHome) PetOverlayService.instance?.onHomeScrolled()
+            return
+        }
         // app keuangan: jangan simpan teks apa pun; cukup catat paketnya (batas waktu, focus)
         val money = Guard.isMoneyApp(e.packageName?.toString())
         if (money) selected = ""
@@ -56,6 +92,7 @@ class PetAccessibilityService : AccessibilityService() {
             // abaikan diri sendiri, status bar & keyboard (bukan "aplikasi dibuka")
             if (pkg == packageName || pkg == "com.android.systemui" ||
                 pkg.contains("inputmethod") || pkg.contains("keyboard")) return
+            onHome = pkg in homePkgs
             if (pkg != currentPkg) {
                 currentPkg = pkg
                 PetOverlayService.instance?.onAppChanged(pkg)

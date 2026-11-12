@@ -38,7 +38,7 @@ import com.hermespet.Prefs.longitude
 import com.hermespet.Prefs.moodCheckEnabled
 import com.hermespet.Prefs.musicDance
 import com.hermespet.Prefs.petScale
-import com.hermespet.Prefs.pillIdleSec
+import com.hermespet.Prefs.fadeIdleSec
 import com.hermespet.Prefs.petVoice
 import com.hermespet.Prefs.sendMoodImage
 import com.hermespet.Prefs.setupDone
@@ -204,19 +204,19 @@ class MainActivity : Activity() {
             })
         })
 
-        val pillLabel = TextView(this)
-        fun pillText(v: Int) = "Jadi pill (dynamic island) setelah diam: " +
+        val fadeLabel = TextView(this)
+        fun fadeText(v: Int) = "Memudar setelah diam: " +
             if (v == 0) "tidak pernah" else "$v detik"
-        pillLabel.text = pillText(pillIdleSec)
-        col.addView(pillLabel)
+        fadeLabel.text = fadeText(fadeIdleSec)
+        col.addView(fadeLabel)
         col.addView(SeekBar(this).apply {
             max = 24 // ×5 detik → 0..120
-            progress = pillIdleSec / 5
+            progress = fadeIdleSec / 5
             setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
                 override fun onProgressChanged(sb: SeekBar?, p: Int, fromUser: Boolean) {
                     if (!fromUser) return
-                    pillIdleSec = p * 5
-                    pillLabel.text = pillText(p * 5)
+                    fadeIdleSec = p * 5
+                    fadeLabel.text = fadeText(p * 5)
                 }
                 override fun onStartTrackingTouch(sb: SeekBar?) {}
                 override fun onStopTrackingTouch(sb: SeekBar?) {}

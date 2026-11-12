@@ -13,6 +13,7 @@ import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
 import android.graphics.Color
 import android.graphics.PixelFormat
+import android.graphics.Rect
 import android.graphics.drawable.GradientDrawable
 import android.os.BatteryManager
 import android.os.Build
@@ -45,7 +46,7 @@ import com.hermespet.Prefs.petScale
 import com.hermespet.Prefs.petVoice
 import com.hermespet.Prefs.petX
 import com.hermespet.Prefs.petY
-import com.hermespet.Prefs.pillIdleSec
+import com.hermespet.Prefs.fadeIdleSec
 import com.hermespet.Prefs.sendMoodImage
 import org.json.JSONObject
 import java.util.Calendar
@@ -60,9 +61,10 @@ class PetOverlayService : Service() {
         const val ACTION_APPLY_SCALE = "com.hermespet.APPLY_SCALE"
 
         private const val BASE_SIZE_DP = 144 // View lebih besar; sprite isi ~66% + ruang gerak
+        private const val FADE_ALPHA = 0.22f
         private const val TICK_MS = 60_000L
         private const val MOOD_MS = 60 * 60_000L // tiap jam
-        private const val WALK_FRAME_MS = 16L // ~60 fps
+        private const val WALK_FRAME_MS = 33L // ~30 fps (hemat baterai)
         /** Aplikasi chat yang dibacakan saat mode nyetir. */
         private val CHAT_APPS = listOf("com.whatsapp", "org.telegram", "org.thunderdog.challegram",
             "jp.naver.line", "org.thoughtcrime.securesms", "com.facebook.orca",
@@ -93,11 +95,11 @@ class PetOverlayService : Service() {
     private var nextHopAt = 0L
     private val hopDurMs = 520L
 
-    // --- PILL mode (v2): "dynamic island" kecil di atas-tengah, hemat baterai ---
-    private lateinit var pill: TextView
-    private var pillMode = false
-    private var pillBadge = 0
-    private var pillPulse: android.animation.ObjectAnimator? = null
+    // --- memudar saat diam / transparan saat full screen (hemat baterai) ---
+    private var faded = false
+    private var fullscreen = false
+    private val dormant get() = faded || fullscreen
+    private var onPlatform = false
     private var lastActivityAt = System.currentTimeMillis()
 
     override fun onBind(intent: Intent?): IBinder? = null
@@ -122,7 +124,8 @@ class PetOverlayService : Service() {
         handler.postDelayed(moodLoop, 20_000) // cek pertama tak lama setelah start
         handler.post(moodTick)
         handler.postDelayed(musicLoop, 3_000)
-        handler.postDelayed(pillLoop, 5_000)
+        handler.postDelayed(fadeLoop, 5_000)
+        setupFullscreenProbe()
         startLan()
         startShake()
         pet.emotion = Mood.current(this)
@@ -163,9 +166,12 @@ class PetOverlayService : Service() {
     private val screenReceiver = object : android.content.BroadcastReceiver() {
         override fun onReceive(c: Context?, i: Intent?) {
             when (i?.action) {
-                Intent.ACTION_SCREEN_OFF -> { screenOn = false; pet.awake = false; stopVisualizer() }
+                Intent.ACTION_SCREEN_OFF -> { // layar mati: sensor goyang ikut mati (hemat baterai)
+                    screenOn = false; pet.awake = false; stopVisualizer()
+                    (getSystemService(SENSOR_SERVICE) as android.hardware.SensorManager).unregisterListener(shake)
+                }
                 Intent.ACTION_SCREEN_ON -> {
-                    screenOn = true; pet.awake = !pillMode
+                    screenOn = true; pet.awake = !dormant; startShake()
                     pet.emotion = Mood.current(this@PetOverlayService)
                 }
                 Intent.ACTION_USER_PRESENT -> maybeGreet() // buka kunci → sapa
@@ -205,6 +211,7 @@ class PetOverlayService : Service() {
         closeChat()
         hideBlocker()
         if (bubbleShown) runCatching { wm.removeView(bubble) }
+        runCatching { wm.removeView(probe) }
         runCatching { wm.removeView(root) }
         super.onDestroy()
     }
@@ -219,15 +226,6 @@ class PetOverlayService : Service() {
             gravity = Gravity.CENTER_HORIZONTAL
             addView(pet)
         }
-        pill = TextView(this).apply {
-            gravity = Gravity.CENTER
-            setTextColor(Color.WHITE)
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
-            background = GradientDrawable().apply { cornerRadius = dp(16f) }
-            visibility = View.GONE
-            contentDescription = "Moci (ketuk untuk membuka)"
-        }
-        root.addView(pill, LinearLayout.LayoutParams(dp(120f).toInt(), dp(32f).toInt()))
 
         lp = WindowManager.LayoutParams(
             WindowManager.LayoutParams.WRAP_CONTENT,
@@ -298,10 +296,8 @@ class PetOverlayService : Service() {
         var lastMoveX = 0f; var lastMoveY = 0f; var lastMoveT = 0L
 
         root.setOnTouchListener { _, ev ->
-            if (pillMode) { // pill: cukup ketuk untuk mekar jadi slime
-                if (ev.actionMasked == MotionEvent.ACTION_UP) expandFromPill()
-                return@setOnTouchListener true
-            }
+            if (fullscreen) return@setOnTouchListener false
+            if (faded) wake() // sentuhan membangunkan, lalu diproses seperti biasa
             lastActivityAt = System.currentTimeMillis()
             scaleDetector.onTouchEvent(ev)
             if (ev.pointerCount > 1) return@setOnTouchListener true
@@ -341,7 +337,9 @@ class PetOverlayService : Service() {
                             petX = lp.x; petY = lp.y; posX = lp.x.toFloat()
                             // lempar kalau lepas dengan kecepatan cukup
                             val speedPxs = kotlin.math.hypot(velX.toDouble(), velY.toDouble()) * 1000
+                            refreshPlatforms(true)
                             if (speedPxs > 600 && now - lastMoveT < 120) startFling()
+                            else if (platforms.isNotEmpty()) { velX = 0f; velY = 0f; startFling() } // jatuh ke ikon
                         }
                         now - downAt > 400 -> toggleChat() // tahan = ngobrol via ketik
                         now - lastTapAt < 350 -> { // double-tap = ngobrol via suara
@@ -597,6 +595,8 @@ class PetOverlayService : Service() {
         if (blockerView != null && pkg != blockerPkg) hideBlocker()
         checkRules(ruleState(pkg))
         checkLimit(pkg)
+        handler.postDelayed({ checkFullscreen() }, 400) // app baru bisa saja full screen
+        platformsAt = 0L
     }
 
     private var blockerView: View? = null
@@ -653,74 +653,68 @@ class PetOverlayService : Service() {
         blockerView = null; blockerPkg = ""
     }
 
-    // ---------------------------------------------------------------- pill mode
+    // ---------------------------------------------------------------- memudar & full screen
 
-    /** Cek idle tiap 5 detik: PET tanpa interaksi > pillIdleSec → menyusut jadi PILL. */
-    private val pillLoop = object : Runnable {
+    private var saver = false
+
+    /** Tiap 5 detik: diam > fadeIdleSec → memudar; baterai kecil → lebih cepat & hemat. */
+    private val fadeLoop = object : Runnable {
         override fun run() {
-            val idleMs = pillIdleSec * 1000L
+            val bm = getSystemService(Context.BATTERY_SERVICE) as BatteryManager
+            saver = bm.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY) < 20 && !bm.isCharging
+            val idleMs = (if (saver) minOf(fadeIdleSec, 10) else fadeIdleSec) * 1000L
             val now = System.currentTimeMillis()
-            if (pillMode) updatePill()
-            else if (idleMs > 0 && screenOn && chatView == null && !bubbleShown && !flinging &&
-                now - lastActivityAt > idleMs && now > pausedUntil) collapseToPill()
+            if (!faded && idleMs > 0 && screenOn && chatView == null && !bubbleShown && !flinging &&
+                now - lastActivityAt > idleMs && now > pausedUntil) fadeOut()
             handler.postDelayed(this, 5_000)
         }
     }
 
-    private fun updatePill() {
-        (pill.background as GradientDrawable).setColor(pet.bodyColor())
-        pill.text = if (pillBadge > 0) "🔔 $pillBadge" else ""
-    }
-
-    private fun collapseToPill() {
-        if (pillMode) return
-        pillMode = true
-        closeChat()
+    private fun fadeOut() {
+        faded = true
         pet.awake = false
         stopVisualizer()
-        petX = lp.x; petY = lp.y
-        pet.visibility = View.GONE
-        pill.visibility = View.VISIBLE
-        updatePill()
-        val screenW = resources.displayMetrics.widthPixels
-        lp.x = (screenW - dp(120f).toInt()) / 2
-        lp.y = dp(6f).toInt()
-        runCatching { wm.updateViewLayout(root, lp) }
-        pill.scaleX = 0.3f
-        pill.animate().scaleX(1f).setDuration(220).start()
-        // denyut ringan (alpha) — satu animator, murah
-        pillPulse = android.animation.ObjectAnimator.ofFloat(pill, "alpha", 1f, 0.7f).apply {
-            duration = 1600
-            repeatMode = android.animation.ValueAnimator.REVERSE
-            repeatCount = android.animation.ValueAnimator.INFINITE
-            start()
-        }
+        root.animate().alpha(FADE_ALPHA).setDuration(600).start()
     }
 
-    /** Pill → mekar → slime jatuh dari pill (pakai fisika lempar yang sudah ada) → PET. */
-    private fun expandFromPill() {
-        if (!pillMode) return
-        pillMode = false
-        pillBadge = 0
-        pillPulse?.cancel(); pillPulse = null
+    private fun wake() {
         lastActivityAt = System.currentTimeMillis()
-        pill.animate().scaleX(1.25f).scaleY(1.25f).setDuration(140).withEndAction {
-            pill.visibility = View.GONE
-            pill.scaleX = 1f; pill.scaleY = 1f; pill.alpha = 1f
-            pet.visibility = View.VISIBLE
-            pet.awake = screenOn
-            val size = (dp(BASE_SIZE_DP.toFloat()) * petScale).toInt()
-            lp.x = lp.x + dp(60f).toInt() - size / 2
-            runCatching { wm.updateViewLayout(root, lp) }
-            root.post { velX = 0f; velY = 0f; startFling() } // "slime drop"
-        }.start()
+        if (!faded) return
+        faded = false
+        if (!fullscreen) { pet.awake = screenOn; root.animate().alpha(1f).setDuration(200).start() }
     }
 
-    private fun flashPill() {
-        updatePill()
-        pill.animate().scaleX(1.18f).scaleY(1.18f).setDuration(120).withEndAction {
-            pill.animate().scaleX(1f).scaleY(1f).setDuration(160).start()
-        }.start()
+    // Deteksi full screen: jendela 1px tanpa FLAG_LAYOUT_IN_SCREEN ditaruh di bawah status bar
+    // saat status bar tampil (y>0) dan di y=0 saat disembunyikan app (video/game/immersive).
+    private lateinit var probe: View
+    private fun setupFullscreenProbe() {
+        probe = View(this)
+        val plp = WindowManager.LayoutParams(1, 1, WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
+                WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL, PixelFormat.TRANSLUCENT
+        ).apply { gravity = Gravity.TOP or Gravity.START }
+        probe.viewTreeObserver.addOnGlobalLayoutListener { checkFullscreen() }
+        runCatching { wm.addView(probe, plp) }
+    }
+
+    private fun checkFullscreen() {
+        val loc = IntArray(2)
+        probe.getLocationOnScreen(loc)
+        val fs = probe.isAttachedToWindow && loc[1] == 0
+        if (fs == fullscreen) return
+        fullscreen = fs
+        lp.flags = if (fs) lp.flags or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
+                   else lp.flags and WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE.inv()
+        if (fs) {
+            pet.awake = false
+            stopVisualizer()
+            root.animate().cancel(); root.alpha = 0f
+            if (bubbleShown) hideBubble.run()
+        } else {
+            pet.awake = screenOn && !faded
+            root.animate().alpha(if (faded) FADE_ALPHA else 1f).setDuration(300).start()
+        }
+        runCatching { wm.updateViewLayout(root, lp) }
     }
 
     private fun closeChat() {
@@ -780,7 +774,7 @@ class PetOverlayService : Service() {
 
     private fun onShake() {
         lastActivityAt = System.currentTimeMillis()
-        if (pillMode) expandFromPill()
+        wake()
         if (chatView == null) toggleChat()
         PetLog.add(this, "aksi", "📳 dipanggil lewat goyang")
     }
@@ -849,19 +843,65 @@ class PetOverlayService : Service() {
         velX *= 16f; velY *= 16f
     }
 
+    // --- ikon homescreen jadi pijakan (v2.0-plus) ---
+    private var platforms: List<Rect> = emptyList()
+    private var platformsAt = 0L
+    private var offY = 0 // selisih koordinat layar vs koordinat window (status bar)
+
+    /** Baca posisi ikon launcher (di-cache; hanya di homescreen, mati saat hemat baterai). */
+    private fun refreshPlatforms(force: Boolean = false) {
+        val now = System.currentTimeMillis()
+        val onHome = PetAccessibilityService.onHome
+        if (!onHome || saver || dormant || !screenOn) { platforms = emptyList(); return }
+        if (!force && now - platformsAt < 4_000) return
+        platformsAt = now
+        val loc = IntArray(2); root.getLocationOnScreen(loc); offY = loc[1] - lp.y
+        platforms = PetAccessibilityService.instance?.iconRects() ?: emptyList()
+    }
+
+    fun onHomeScrolled() { platformsAt = System.currentTimeMillis() - 3_400 } // rescan ±0,6 dtk lagi
+
+    private fun supportTop(cx: Float, bottomW: Float, tol: Float): Float? = platforms.firstOrNull { r ->
+        cx >= r.left && cx <= r.right && abs(r.top - offY - bottomW) <= tol
+    }?.let { (it.top - offY).toFloat() }
+
+    /** Lompat ke ikon lain (busur parabola memakai gravitasi yang sama dengan lemparan). */
+    private fun jumpTo(r: Rect) {
+        val g = 1.4f
+        val gain = lp.y - (r.top - offY - pet.height).toFloat() // >0 = ikon target lebih tinggi
+        val margin = dp(40f)
+        val vy = -kotlin.math.sqrt(2 * g * (gain.coerceAtLeast(0f) + margin))
+        val t = (-vy + kotlin.math.sqrt(vy * vy - 2 * g * gain)) / g // frame sampai sejajar target
+        val tx = (r.centerX() - pet.width / 2f)
+        velX = (tx - lp.x) / t.coerceAtLeast(1f) / 16f // startFling mengalikan 16 lagi
+        velY = vy / 16f
+        pet.facing = if (tx > lp.x) 1 else -1
+        startFling()
+    }
+
     /** Satu langkah fisika lemparan: gravitasi + pantul tepi layar + redam. */
     private fun flingStep() {
         val maxX = (resources.displayMetrics.widthPixels - pet.width).toFloat().coerceAtLeast(1f)
         val maxY = (resources.displayMetrics.heightPixels - pet.height).toFloat().coerceAtLeast(1f)
         velY += 1.4f                     // gravitasi
         velX *= 0.995f                   // gesekan udara
+        val prevFy = fy
         fx += velX; fy += velY
+        // ikon homescreen = lantai kalau jatuh dari atasnya
+        var floor = maxY
+        if (velY > 0f) {
+            val cx = fx + pet.width / 2f
+            for (r in platforms) {
+                val t = (r.top - offY - pet.height).toFloat()
+                if (cx >= r.left && cx <= r.right && prevFy <= t + 1f && fy >= t && t < floor) floor = t
+            }
+        }
         val restitution = 0.62f
         if (fx <= 0f) { fx = 0f; velX = -velX * restitution; pet.bump(true) }
         else if (fx >= maxX) { fx = maxX; velX = -velX * restitution; pet.bump(true) }
         if (fy <= 0f) { fy = 0f; velY = -velY * restitution }
-        else if (fy >= maxY) { // mendarat di "lantai"
-            fy = maxY
+        else if (fy >= floor) { // mendarat di "lantai" (dasar layar atau ikon)
+            fy = floor
             if (velY > 4f) pet.bump(false)
             velY = -velY * restitution
             velX *= 0.7f                  // gesekan lantai
@@ -870,8 +910,9 @@ class PetOverlayService : Service() {
         runCatching { wm.updateViewLayout(root, lp) }
         if (bubbleShown) positionBubble()
         // berhenti saat sudah menempel lantai & nyaris diam
-        if (fy >= maxY - 1f && kotlin.math.abs(velY) < 4f && kotlin.math.abs(velX) < 0.5f) {
+        if (fy >= floor - 1f && kotlin.math.abs(velY) < 4f && kotlin.math.abs(velX) < 0.5f) {
             flinging = false
+            onPlatform = floor < maxY
             posX = fx.coerceIn(0f, maxX); petX = lp.x; petY = lp.y
             pausedUntil = System.currentTimeMillis() + 1_500
             walkTargetX = -1
@@ -880,12 +921,17 @@ class PetOverlayService : Service() {
 
     private val walkLoop = object : Runnable {
         override fun run() {
-            if (!screenOn || pillMode) { // layar mati / pill → jangan render/gerak (hemat baterai)
-                handler.postDelayed(this, 1_000)
+            if (!screenOn || dormant) { // layar mati / memudar / full screen → diam total (hemat baterai)
+                handler.postDelayed(this, 2_000)
                 return
             }
             if (flinging) { flingStep(); handler.postDelayed(this, WALK_FRAME_MS); return }
             val now = System.currentTimeMillis()
+            refreshPlatforms()
+            if (onPlatform && hopStart == 0L && supportTop(posX + pet.width / 2f, (lp.y + pet.height).toFloat(), 8f) == null) {
+                onPlatform = false; velX = 0f; velY = 0f; startFling() // pijakan hilang / berjalan keluar ikon → jatuh
+                handler.postDelayed(this, WALK_FRAME_MS); return
+            }
             val maxX = (resources.displayMetrics.widthPixels - pet.width).coerceAtLeast(1)
             if (now >= pausedUntil) {
                 val dist = walkTargetX - posX
@@ -894,6 +940,12 @@ class PetOverlayService : Service() {
                         // sampai tujuan → istirahat (denyut idle), lalu pilih tujuan baru
                         walkTargetX = Random.nextInt(0, maxX)
                         pausedUntil = now + Random.nextLong(4_000, 15_000)
+                        if (platforms.isNotEmpty() && Random.nextInt(100) < 40) {
+                            // kadang melompat ke ikon lain yang masih terjangkau
+                            val reach = dp(300f)
+                            platforms.filter { abs(it.centerX() - posX) < reach && it.top - offY - pet.height != lp.y }
+                                .randomOrNull()?.let { jumpTo(it); pausedUntil = now + 2_000 }
+                        }
                         hopStart = 0L
                         pet.hopT = -1f
                     }
@@ -1001,7 +1053,7 @@ class PetOverlayService : Service() {
     private val musicLoop = object : Runnable {
         override fun run() {
             val am = getSystemService(Context.AUDIO_SERVICE) as android.media.AudioManager
-            val want = musicDance && screenOn && !pillMode && am.isMusicActive
+            val want = musicDance && screenOn && !dormant && am.isMusicActive
             if (want && visualizer == null) startVisualizer()
             else if (!want && visualizer != null) stopVisualizer()
             handler.postDelayed(this, 2_000)
@@ -1043,7 +1095,6 @@ class PetOverlayService : Service() {
             val clean = "Pesan dari $title. $text".filter { it.code < 0x2190 }.take(300)
             tts?.speak(clean, TextToSpeech.QUEUE_ADD, null, "drive-${System.nanoTime()}")
         }
-        if (pillMode) handler.post { pillBadge++; flashPill() }
         val data = JSONObject().put("package", pkg).put("title", title).put("text", text)
         sendToBrain("notification", data)
     }
@@ -1141,7 +1192,7 @@ class PetOverlayService : Service() {
             if (type == "chat" || type == "mood" || type == "vision") Mood.note(this, emo)
         }
         val text = reply.optString("say", "")
-        if (pillMode && type == "notification") { // pill: cukup badge + kedip, jangan mekar
+        if (fullscreen && type == "notification") { // full screen: jangan ganggu, cukup catat
             if (text.isNotEmpty()) PetLog.add(this, "pet", text)
             return
         }
@@ -1316,8 +1367,7 @@ class PetOverlayService : Service() {
     }
 
     private fun say(text: String, emotion: PetView.Emotion?, typewriter: Boolean = false) {
-        if (pillMode) expandFromPill()
-        lastActivityAt = System.currentTimeMillis()
+        wake()
         emotion?.let { pet.emotion = it }
         handler.removeCallbacks(typeRunnable)
         val firstShow = !bubbleShown
