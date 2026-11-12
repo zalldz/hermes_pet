@@ -687,6 +687,7 @@ class PetOverlayService : Service() {
     // Deteksi full screen: jendela 1px tanpa FLAG_LAYOUT_IN_SCREEN ditaruh di bawah status bar
     // saat status bar tampil (y>0) dan di y=0 saat disembunyikan app (video/game/immersive).
     private lateinit var probe: View
+    private var sawBar = false
     private fun setupFullscreenProbe() {
         probe = View(this)
         val plp = WindowManager.LayoutParams(1, 1, WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
@@ -700,7 +701,10 @@ class PetOverlayService : Service() {
     private fun checkFullscreen() {
         val loc = IntArray(2)
         probe.getLocationOnScreen(loc)
-        val fs = probe.isAttachedToWindow && loc[1] == 0
+        if (loc[1] > 0) sawBar = true
+        // shortcut: baru percaya "full screen" setelah pernah melihat status bar (y>0); di ROM yang
+        // tidak menggeser jendela overlay, deteksi mati dan slime tetap terlihat. Upgrade: pakai insets.
+        val fs = sawBar && probe.isAttachedToWindow && loc[1] == 0
         if (fs == fullscreen) return
         fullscreen = fs
         lp.flags = if (fs) lp.flags or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
