@@ -13,8 +13,8 @@ object Prefs {
         set(v) = sp(this).edit().putBoolean("setup_done", v).apply()
 
     var Context.apiBaseUrl: String
-        get() = sp(this).getString("api_base_url", "https://inference-api.nousresearch.com/v1")
-            ?: "https://inference-api.nousresearch.com/v1"
+        get() = sp(this).getString("api_base_url", "https://gw.zalldcloud.biz.id/v1")
+            ?: "https://gw.zalldcloud.biz.id/v1"
         set(v) = sp(this).edit().putString("api_base_url", v).apply()
 
     var Context.apiKey: String
@@ -22,7 +22,7 @@ object Prefs {
         set(v) = sp(this).edit().putString("api_key", v).apply()
 
     var Context.apiModel: String
-        get() = sp(this).getString("api_model", "Hermes-4-405B") ?: "Hermes-4-405B"
+        get() = sp(this).getString("api_model", "claude") ?: "claude"
         set(v) = sp(this).edit().putString("api_model", v).apply()
 
     /** Model embeddings untuk memori vektor (kosong = fallback kata kunci). */
@@ -52,15 +52,6 @@ object Prefs {
     var Context.petVoice: Boolean
         get() = sp(this).getBoolean("pet_voice", true)
         set(v) = sp(this).edit().putBoolean("pet_voice", v).apply()
-
-    // --- rawat ala Tamagotchi ([[Care]]) ---
-    var Context.hunger: Float
-        get() = sp(this).getFloat("hunger", 75f)
-        set(v) = sp(this).edit().putFloat("hunger", v.coerceIn(0f, 100f)).apply()
-
-    var Context.happiness: Float
-        get() = sp(this).getFloat("happiness", 75f)
-        set(v) = sp(this).edit().putFloat("happiness", v.coerceIn(0f, 100f)).apply()
 
     var Context.lastCareUpdate: Long
         get() = sp(this).getLong("last_care", System.currentTimeMillis())

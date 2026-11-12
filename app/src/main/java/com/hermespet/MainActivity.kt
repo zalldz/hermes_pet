@@ -115,25 +115,29 @@ class MainActivity : Activity() {
         }
         col.addView(keyInput)
 
-        col.addView(button("✅ Tes koneksi AI") {
-            apiKey = keyInput.text.toString().trim()
-            Brain.testConnection(this) { ok, msg ->
-                android.widget.Toast.makeText(this, (if (ok) "✅ " else "❌ ") + msg,
-                    android.widget.Toast.LENGTH_LONG).show()
-            }
-        })
-
         col.addView(hint("Tempel API key (mis. dari OpenRouter). Tanpa key, pet hidup tapi jawabannya bawaan saja."))
 
         col.addView(TextView(this).apply { text = "Model:" })
         val modelInput = EditText(this).apply { setText(apiModel) }
         col.addView(modelInput)
-        col.addView(hint("Nama model AI. Cepat & murah: google/gemini-flash-1.5"))
+        col.addView(hint("Otak homelab: claude (cepat) atau rook"))
 
         col.addView(TextView(this).apply { text = "Base URL API:" })
         val baseInput = EditText(this).apply { setText(apiBaseUrl) }
         col.addView(baseInput)
-        col.addView(hint("Alamat server AI. OpenRouter: https://openrouter.ai/api/v1"))
+        col.addView(hint("Alamat otak. Homelab: https://gw.zalldcloud.biz.id/v1 (jalan tanpa Tailscale)"))
+
+        col.addView(button("✅ Tes koneksi AI") {
+            // uji nilai yang sedang diketik, bukan yang tersimpan lama
+            apiKey = keyInput.text.toString().trim()
+            apiModel = modelInput.text.toString().trim()
+            apiBaseUrl = baseInput.text.toString().trim()
+            android.widget.Toast.makeText(this, "Menguji koneksi…", android.widget.Toast.LENGTH_SHORT).show()
+            Brain.testConnection(this) { ok, msg ->
+                android.widget.Toast.makeText(this, (if (ok) "✅ " else "❌ ") + msg,
+                    android.widget.Toast.LENGTH_LONG).show()
+            }
+        })
 
         col.addView(TextView(this).apply { text = "Model embeddings (opsional):" })
         val embInput = EditText(this).apply { setText(embModel); hint = "mis. text-embedding-3-small" }
@@ -255,11 +259,6 @@ class MainActivity : Activity() {
             setOnCheckedChangeListener { _, on -> shakeSummon = on; toastStatus("Restart pet agar berlaku") }
         }
         col.addView(shakeSwitch)
-
-        col.addView(TextView(this).apply {
-            text = Care.status(this@MainActivity) + "  (kasih makan 🍬 lewat menu chat)"
-            setPadding(0, 8, 0, 8)
-        })
 
         @Suppress("UseSwitchCompatOrMaterialCode")
         val moodSwitch = Switch(this).apply {

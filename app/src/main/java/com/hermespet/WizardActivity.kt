@@ -72,13 +72,10 @@ class WizardActivity : Activity() {
 
         // --- Langkah 2: hubungkan AI ---
         col.addView(step("2️⃣  Hubungkan otak AI"))
-        col.addView(button("Pakai OpenRouter (disarankan)") {
-            apiBaseUrl = "https://openrouter.ai/api/v1"
-            apiModel = "google/gemini-flash-1.5"
-            toast("Preset OpenRouter dipasang. Sekarang tempel API key di bawah.")
-        })
-        col.addView(button("🌐 Buka OpenRouter untuk ambil API key") {
-            open("https://openrouter.ai/keys")
+        col.addView(button("Pakai otak homelab (disarankan)") {
+            apiBaseUrl = "https://gw.zalldcloud.biz.id/v1"
+            apiModel = "claude"
+            toast("Preset homelab dipasang. Tempel token bridge di bawah.")
         })
         col.addView(TextView(this).apply { text = "Tempel API key di sini:"; setPadding(0, 8, 0, 0) })
         keyInput = EditText(this).apply { setText(apiKey); hint = "sk-or-..." }

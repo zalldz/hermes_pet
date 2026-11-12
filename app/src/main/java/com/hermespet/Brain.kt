@@ -32,7 +32,7 @@ import kotlin.random.Random
  */
 object Brain {
     private const val TAG = "Brain"
-    private const val NOTIF_COOLDOWN_MS = 120_000L
+    private const val NOTIF_COOLDOWN_MS = 600_000L
     private const val WEATHER_INTERVAL_MS = 1_800_000L
     private const val LOW_BATT_COOLDOWN_MS = 1_800_000L
 
@@ -354,8 +354,8 @@ object Brain {
 
     private fun handlePoke(ctx: Context, onReply: (JSONObject?) -> Unit) {
         val canned = listOf("Hihi geli! 😆", "Eh, apa? Aku lagi jalan-jalan nih!", "Poke balik! 🐾")
-        askHermes(ctx, "Pemilikmu baru menyentuhmu (poke). Bereaksi singkat dan lucu.",
-            canned[Random.nextInt(canned.size)], "happy", onReply = onReply)
+        // colekan dijawab lokal: instan & tidak makan kuota otak
+        onReply(reply(canned[Random.nextInt(canned.size)], "happy"))
     }
 
     // ------------------------------------------------------------- LLM API
@@ -372,9 +372,12 @@ object Brain {
             .header("Authorization", "Bearer ${ctx.apiKey}")
             .post(body.toString().toRequestBody(jsonType))
             .build()
-        http.newCall(req).enqueue(object : Callback {
+        // tes tidak boleh menggantung 2 menit: batas total 30 dtk
+        http.newBuilder().callTimeout(30, TimeUnit.SECONDS).build().newCall(req).enqueue(object : Callback {
             override fun onFailure(call: Call, e: IOException) {
-                main.post { onResult(false, "Gagal konek 📡 (cek internet): ${e.message ?: ""}") }
+                val why = if (e is java.io.InterruptedIOException) "server tak menjawab 30 dtk — cek Base URL/Tailscale"
+                    else "cek internet/Base URL: ${e.message ?: ""}"
+                main.post { onResult(false, "Gagal konek 📡 ($why)") }
             }
             override fun onResponse(call: Call, response: Response) {
                 val res = response.use { r ->

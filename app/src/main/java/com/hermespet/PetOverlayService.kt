@@ -394,7 +394,6 @@ class PetOverlayService : Service() {
                 cornerRadius = dp(12f)
             }
         }
-        val feed = toolBtn("🍬", "Makan") // kasih makan
         val eye = toolBtn("👁", "Lihat")  // lihat layar
         val fren = toolBtn("📡", "Teman")  // kirim teks ke teman di WiFi
         val ptt = toolBtn("🎙️", "Tahan")  // tahan = pesan suara ke teman
@@ -427,8 +426,7 @@ class PetOverlayService : Service() {
         val bottomRow = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             setPadding(0, dp(8f).toInt(), 0, 0)
-            addView(feed, cell(true))
-            addView(eye, cell(false))
+            addView(eye, cell(true))
             addView(fren, cell(false))
             addView(ptt, cell(false))
         }
@@ -480,7 +478,6 @@ class PetOverlayService : Service() {
             closeChat()
             lookAtScreen(q)
         }
-        feed.setOnClickListener { closeChat(); feedPet() }
         fren.setOnClickListener {
             val text = input.text.toString().trim()
             if (text.isEmpty()) {
@@ -731,19 +728,7 @@ class PetOverlayService : Service() {
 
     private fun onPoked() {
         pet.emotion = PetView.Emotion.SURPRISED
-        Care.cheer(this)
         sendToBrain("poke", JSONObject())
-    }
-
-    private fun feedPet() {
-        Care.feed(this)
-        pet.emotion = PetView.Emotion.LOVE
-        transientUntil = System.currentTimeMillis() + 4_000
-        pet.bump(false) // gerakan "hap" saat makan
-        val msg = listOf("Nyam nyam! 😋", "Enaak~ makasih! 🥰", "Hap! Kenyang 😊").random()
-        say(msg, null, typewriter = true)
-        speak(msg)
-        PetLog.add(this, "aksi", "diberi makan — ${Care.status(this)}")
     }
 
     // ---------------------------------------------------------------- suara
@@ -1029,24 +1014,13 @@ class PetOverlayService : Service() {
         }
     }
 
-    // baseline emosi pet mengikuti suasana hati + perawatan saat idle (tiap 15 detik),
+    // baseline emosi pet mengikuti suasana hati saat idle (tiap 15 detik),
     // kecuali sedang menampilkan reaksi sesaat (transientUntil)
     private var transientUntil = 0L
-    private var lastHungerNag = 0L
     private val moodTick = object : Runnable {
         override fun run() {
             if (System.currentTimeMillis() > transientUntil) {
-                val base = Mood.current(this@PetOverlayService)
-                // saat mood netral, perawatan (lapar/bosan) yang menentukan ekspresi
-                pet.emotion = if (base == PetView.Emotion.NEUTRAL)
-                    (Care.moodHint(this@PetOverlayService) ?: base) else base
-            }
-            // rengekan lapar (tanpa API), maksimal tiap 30 menit
-            val now = System.currentTimeMillis()
-            if (Care.veryHungry(this@PetOverlayService) && now - lastHungerNag > 30 * 60_000L) {
-                lastHungerNag = now
-                val m = "Perutku keroncongan, kasih makan dong 🥺"
-                say(m, PetView.Emotion.SAD, typewriter = true); speak(m)
+                pet.emotion = Mood.current(this@PetOverlayService)
             }
             handler.postDelayed(this, 15_000)
         }
@@ -1159,7 +1133,7 @@ class PetOverlayService : Service() {
 
     private fun sendToBrain(type: String, data: JSONObject) {
         // interaksi langsung memperbarui "kapan terakhir disapa" (anti-kesepian)
-        if (type == "chat" || type == "poke") { Mood.noteInteraction(this); Care.cheer(this) }
+        if (type == "chat" || type == "poke") Mood.noteInteraction(this)
         if (type == "chat") { // perintah baru pemilik = tugas agent baru
             agentTask = data.optString("text"); agentStep = 0; agentDone.setLength(0)
         }
