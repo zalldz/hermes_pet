@@ -11,6 +11,7 @@ class NotifListener : NotificationListenerService() {
 
     override fun onNotificationPosted(sbn: StatusBarNotification) {
         if (sbn.packageName == packageName) return // abaikan notifikasi sendiri
+        if (sbn.notification.flags and android.app.Notification.FLAG_GROUP_SUMMARY != 0) return // ringkasan "N pesan baru"
         if (!sbn.isClearable) return // skip notifikasi persisten (musik, FGS, dll.)
 
         val extras = sbn.notification.extras

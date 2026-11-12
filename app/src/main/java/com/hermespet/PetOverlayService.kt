@@ -111,7 +111,11 @@ class PetOverlayService : Service() {
         wm = getSystemService(WINDOW_SERVICE) as WindowManager
         Senses.start(this)
         tts = TextToSpeech(this) { status ->
-            if (status == TextToSpeech.SUCCESS) tts?.language = Locale("id", "ID")
+            if (status == TextToSpeech.SUCCESS) {
+                tts?.language = Locale("id", "ID")
+                pickBestVoice()
+                tts?.setSpeechRate(0.95f)
+            }
         }
         buildOverlay()
         registerReceiver(screenReceiver, IntentFilter().apply {
@@ -1066,9 +1070,25 @@ class PetOverlayService : Service() {
         pet.beat = 0f
     }
 
+    /** Pilih suara Indonesia terbaik yang terpasang: kualitas tertinggi, jaringan (neural) diutamakan. */
+    private fun pickBestVoice() {
+        val v = runCatching {
+            tts?.voices?.filter { it.locale.language == "id" && !it.features.orEmpty().contains("notInstalled") }
+                ?.maxByOrNull { it.quality * 2 + (if (it.isNetworkConnectionRequired) 1 else 0) }
+        }.getOrNull()
+        if (v != null) tts?.voice = v
+    }
+
+    // WA memposting ulang notifikasi yang sama (update grup, ringkasan, dibaca) → jangan dibacakan berulang
+    private val spoken = HashMap<String, Long>()
+
     fun onNotificationSeen(pkg: String, title: String, text: String) {
         PetLog.add(this, "notif", "$pkg: $title — ${text.take(80)}")
-        if (drivingMode && CHAT_APPS.any { pkg.startsWith(it) }) {
+        val now = System.currentTimeMillis()
+        val key = "$pkg|$title|$text"
+        spoken.entries.removeAll { now - it.value > 10 * 60_000 }
+        val fresh = spoken.put(key, now) == null
+        if (drivingMode && fresh && CHAT_APPS.any { pkg.startsWith(it) }) {
             // mode nyetir: bacakan walau suara pet dimatikan; antre supaya tidak saling potong
             val clean = "Pesan dari $title. $text".filter { it.code < 0x2190 }.take(300)
             tts?.speak(clean, TextToSpeech.QUEUE_ADD, null, "drive-${System.nanoTime()}")
