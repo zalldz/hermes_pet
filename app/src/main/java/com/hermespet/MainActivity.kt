@@ -35,12 +35,15 @@ import com.hermespet.Prefs.sfxOn
 import com.hermespet.Prefs.petVoice
 import com.hermespet.Prefs.setupDone
 import com.hermespet.Prefs.soulMd
+import com.hermespet.Prefs.tgChatId
+import com.hermespet.Prefs.tgToken
 
 class MainActivity : Activity() {
 
     private lateinit var status: TextView
     private lateinit var permPanel: LinearLayout
     private var guiding = false
+    private var guardSwitch: Switch? = null
 
     private fun grantAll() {
         guiding = true
@@ -291,6 +294,39 @@ class MainActivity : Activity() {
         col.addView(smsSwitch)
         col.addView(hint("Default mati. Kirim SMS & telepon selalu minta konfirmasimu dulu."))
 
+        // --- satpam HP ---
+        col.addView(section("4. Satpam HP 🚨"))
+        col.addView(hint("Tiap PIN/pola salah di layar kunci, Moci memotret pakai kamera depan + kirim lokasi ke Telegram. " +
+            "Pet harus hidup (syarat Android untuk kamera latar)."))
+        col.addView(TextView(this).apply { text = "Token bot Telegram:" })
+        val tgTokenInput = EditText(this).apply { setText(tgToken); hint = "123456:ABC… (dari @BotFather)" }
+        col.addView(tgTokenInput)
+        col.addView(TextView(this).apply { text = "Chat ID tujuan:" })
+        val tgChatInput = EditText(this).apply { setText(tgChatId); hint = "mis. 123456789" }
+        col.addView(tgChatInput)
+        fun saveTg() { tgToken = tgTokenInput.text.toString().trim(); tgChatId = tgChatInput.text.toString().trim() }
+        col.addView(button("✅ Simpan & tes kirim ke Telegram") {
+            saveTg()
+            if (tgToken.isBlank() || tgChatId.isBlank()) return@button toastStatus("Isi token & chat ID dulu")
+            Intruder.sendText(this, "✅ Satpam Mocipet terhubung") { err ->
+                runOnUiThread { toastStatus(if (err == null) "Terkirim ✅ cek Telegram" else "❌ $err") }
+            }
+        })
+        @Suppress("UseSwitchCompatOrMaterialCode")
+        val guardSwitch = Switch(this).apply { text = "Aktifkan satpam (Device Admin)" }
+        this.guardSwitch = guardSwitch
+        guardSwitch.isChecked = Intruder.active(this)
+        guardSwitch.setOnCheckedChangeListener { sw, on ->
+            if (on == Intruder.active(this)) return@setOnCheckedChangeListener
+            saveTg()
+            if (on) startActivity(Intruder.enableIntent(this))
+            else getSystemService(android.app.admin.DevicePolicyManager::class.java).removeActiveAdmin(Intruder.component(this))
+            sw.postDelayed({ sw.isChecked = Intruder.active(this) }, 800) // dialog ditolak / hapus admin async
+        }
+        col.addView(guardSwitch)
+        if (checkSelfPermission(Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED)
+            col.addView(hint("⚠️ Izin Kamera belum aktif — tanpa itu hanya teks + lokasi yang terkirim."))
+
         // --- start/stop ---
         col.addView(section("5. Jalankan"))
         col.addView(button("▶  Hidupkan pet") {
@@ -325,6 +361,7 @@ class MainActivity : Activity() {
     override fun onResume() {
         super.onResume()
         refreshStatus()
+        guardSwitch?.isChecked = Intruder.active(this)
         // melanjutkan panduan izin saat kembali dari layar setelan
         if (guiding) permPanel.postDelayed({ openNextSpecial() }, 400)
     }

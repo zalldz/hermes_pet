@@ -216,7 +216,7 @@ object Actions {
         val sec = a.optInt("seconds", 0)
         PetOverlayService.instance?.refreshForegroundType() // tambah tipe camera/mic bila izin baru diberikan
         when (a.optString("type")) {
-            "capture_photo" -> MediaCapture.photo(ctx, a.optBoolean("front"), done)
+            "capture_photo" -> MediaCapture.photo(ctx, a.optBoolean("front"), done = done)
             "capture_video" -> MediaCapture.video(ctx, a.optBoolean("front"), sec, done)
             "capture_audio" -> MediaCapture.audio(ctx, sec, done)
             else -> return MediaCapture.stop(ctx)

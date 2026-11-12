@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- satpam HP: hanya memantau login gagal (tidak bisa kunci/hapus HP) -->
+<device-admin>
+    <uses-policies>
+        <watch-login />
+    </uses-policies>
+</device-admin>

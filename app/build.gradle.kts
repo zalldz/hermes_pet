@@ -11,8 +11,8 @@ android {
         applicationId = "com.hermespet"
         minSdk = 26
         targetSdk = 34
-        versionCode = 28
-        versionName = "2.6.0-kamera"
+        versionCode = 29
+        versionName = "2.7.0-satpam"
     }
 
     // kunci debug tetap (di-commit) supaya semua build CI bertanda tangan sama

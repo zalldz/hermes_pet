@@ -68,7 +68,7 @@ object MediaCapture {
     }
 
     // ------------------------------------------------------------------ foto
-    fun photo(c: Context, front: Boolean, done: (String) -> Unit) {
+    fun photo(c: Context, front: Boolean, sink: ((ByteArray) -> Unit)? = null, done: (String) -> Unit) {
         if (!has(c, Manifest.permission.CAMERA)) return done("Izinkan Kamera dulu di Pengaturan Mocipet 📷")
         if (mode != Mode.IDLE) return done("Lagi merekam, stop dulu ya 🔴")
         val id = camId(c, front) ?: return done("Kamera ${if (front) "depan" else "belakang"} tidak ada 😞")
@@ -86,6 +86,7 @@ object MediaCapture {
             val img = r.acquireLatestImage() ?: return@setOnImageAvailableListener
             val bytes = img.planes[0].buffer.let { b -> ByteArray(b.remaining()).also { b.get(it) } }
             img.close()
+            sink?.invoke(bytes)
             try {
                 val uri = insert(c, MediaStore.Images.Media.EXTERNAL_CONTENT_URI, "Moci_${stamp()}.jpg",
                     "image/jpeg", "Pictures/Mocipet")!!

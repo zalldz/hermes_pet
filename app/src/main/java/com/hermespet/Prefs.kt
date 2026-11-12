@@ -153,4 +153,13 @@ object Prefs {
     var Context.petY: Int
         get() = sp(this).getInt("pet_y", 600)
         set(v) = sp(this).edit().putInt("pet_y", v).apply()
+
+    // --- satpam HP: foto penyusup ke Telegram (token disimpan lokal, bukan di repo) ---
+    var Context.tgToken: String
+        get() = sp(this).getString("tg_token", "") ?: ""
+        set(v) = sp(this).edit().putString("tg_token", v).apply()
+
+    var Context.tgChatId: String
+        get() = sp(this).getString("tg_chat", "") ?: ""
+        set(v) = sp(this).edit().putString("tg_chat", v).apply()
 }
