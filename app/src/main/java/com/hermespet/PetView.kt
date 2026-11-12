@@ -106,7 +106,7 @@ class PetView(context: Context) : View(context) {
         skinName = want
         // gagal muat → null → kembali ke piksel klasik
         skinBmp = if (want == "classic") null else runCatching {
-            context.assets.open("art/slime_$want.png").use { BitmapFactory.decodeStream(it) }
+            context.assets.open(if (want.startsWith("animal_")) "animal/${want.removePrefix("animal_")}.png" else "art/slime_$want.png").use { BitmapFactory.decodeStream(it) }
         }.getOrNull()
     }
     private var blink = false
@@ -256,8 +256,9 @@ class PetView(context: Context) : View(context) {
         if (facing < 0) canvas.scale(-1f, 1f, w / 2f, h / 2f)
 
         val sprite = skinBmp
+        val animal = sprite != null && skinName.startsWith("animal_")
         if (sprite != null) {
-            spriteP.colorFilter = LightingColorFilter(cur[0], 0)
+            spriteP.colorFilter = if (animal) null else LightingColorFilter(cur[0], 0)
             val hCells = 16f * sprite.height / sprite.width
             spriteDst.set(offX, offY + cell * (15f - hCells), offX + cell * 16f, offY + cell * 15f)
             canvas.drawBitmap(sprite, null, spriteDst, spriteP)
@@ -274,6 +275,27 @@ class PetView(context: Context) : View(context) {
         }
 
         // mata proporsional khas Stardew (2 piksel lebar) — ekspresi tetap terbaca
+        // skin hewan sudah punya wajah sendiri → ekspresi lewat emote saja
+        if (!animal) drawFace(canvas)
+
+        canvas.restore()
+
+        // emote Kenney melayang di atas kepala, ikut denyut
+        Kenney.emoteFor(emotion)?.let { n ->
+            Kenney.bitmap(context, "emote/$n.png")?.let { b ->
+                val sz = cell * 5f
+                val cx = w / 2f + cell * 4f
+                val cy = offY - cell * 1.5f - bobPx + sin(phase * 1.2f) * cell * 0.4f
+                spriteDst.set(cx - sz / 2, cy - sz / 2, cx + sz / 2, cy + sz / 2)
+                spriteP.colorFilter = null; spriteP.isFilterBitmap = false
+                canvas.drawBitmap(b, null, spriteDst, spriteP)
+                spriteP.isFilterBitmap = true
+            }
+        }
+        drawParticles(canvas)
+    }
+
+    private fun drawFace(canvas: Canvas) {
         val sleepy = emotion == Emotion.SLEEPY
         when {
             blink || sleepy -> {
@@ -334,8 +356,9 @@ class PetView(context: Context) : View(context) {
             }
         }
 
-        canvas.restore()
+    }
 
+    private fun drawParticles(canvas: Canvas) {
         // partikel reaksi (di atas tubuh, koordinat layar)
         for (p in particles) {
             val a = (p.life.coerceIn(0f, 1f) * 255).toInt()

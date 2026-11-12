@@ -124,6 +124,11 @@ object Prefs {
         get() = sp(this).getString("pet_skin", "classic") ?: "classic"
         set(v) = sp(this).edit().putString("pet_skin", v).apply()
 
+    /** Efek suara Kenney (klik, balasan, error). */
+    var Context.sfxOn: Boolean
+        get() = sp(this).getBoolean("sfx_on", true)
+        set(v) = sp(this).edit().putBoolean("sfx_on", v).apply()
+
     /** Detik tanpa interaksi sebelum pet memudar (0 = tidak pernah). */
     var Context.fadeIdleSec: Int
         get() = sp(this).getInt("pill_idle_sec", 30)

@@ -330,6 +330,7 @@ class PetOverlayService : Service() {
 
     private fun toggleChat() {
         if (chatView != null) { closeChat(); return }
+        Kenney.sfx(this, "open_001")
         // Android 10+ hanya mengizinkan baca clipboard saat window kita fokus
         handler.postDelayed({ Clip.capture(this) }, 800)
         val input = EditText(this).apply {
@@ -431,9 +432,16 @@ class PetOverlayService : Service() {
                 sendToBrain("chat", JSONObject().put("text", text))
             }
         }
-        send.setOnClickListener { submit() }
+        send.setOnClickListener { Kenney.sfx(this, "select_001"); submit() }
         input.setOnEditorActionListener { _, _, _ -> submit(); true }
+        Kenney.bitmap(this, "icon/zoom.png")?.let { b ->
+            eye.text = "Lihat"
+            eye.setCompoundDrawablesWithIntrinsicBounds(null,
+                android.graphics.drawable.BitmapDrawable(resources, b).apply {
+                    setBounds(0, 0, dp(22f).toInt(), dp(22f).toInt()) }, null, null)
+        }
         eye.setOnClickListener {
+            Kenney.sfx(this, "click_001")
             val q = input.text.toString().trim()
                 .ifBlank { "Apa yang kamu lihat di layar ini? Jelaskan singkat." }
             closeChat()
@@ -1221,7 +1229,7 @@ class PetOverlayService : Service() {
 
     private fun say(text: String, emotion: PetView.Emotion?, typewriter: Boolean = false) {
         wake()
-        emotion?.let { pet.emotion = it }
+        emotion?.let { if (pet.emotion != it) Kenney.sfxFor(this, it); pet.emotion = it }
         handler.removeCallbacks(typeRunnable)
         val firstShow = !bubbleShown
         if (typewriter && text.length > 6) {
