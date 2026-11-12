@@ -22,26 +22,16 @@ import com.hermespet.Prefs.apiBaseUrl
 import com.hermespet.Prefs.apiKey
 import com.hermespet.Prefs.apiModel
 import com.hermespet.Prefs.embModel
-import com.hermespet.Prefs.backupPass
-import com.hermespet.Prefs.backupUrl
-import com.hermespet.Prefs.backupUser
 import com.hermespet.Prefs.drivingMode
-import com.hermespet.Prefs.homeSsid
-import com.hermespet.Prefs.shakeSummon
-import com.hermespet.Prefs.homelabToken
-import com.hermespet.Prefs.lanDisplayName
 import com.hermespet.Prefs.smsReadEnabled
-import com.hermespet.Prefs.lanNick
 import com.hermespet.Prefs.visionModel
 import com.hermespet.Prefs.latitude
 import com.hermespet.Prefs.longitude
-import com.hermespet.Prefs.moodCheckEnabled
 import com.hermespet.Prefs.musicDance
 import com.hermespet.Prefs.petScale
 import com.hermespet.Prefs.fadeIdleSec
 import com.hermespet.Prefs.petSkin
 import com.hermespet.Prefs.petVoice
-import com.hermespet.Prefs.sendMoodImage
 import com.hermespet.Prefs.setupDone
 import com.hermespet.Prefs.soulMd
 
@@ -264,30 +254,6 @@ class MainActivity : Activity() {
         col.addView(driveSwitch)
         col.addView(hint("Butuh akses Baca notifikasi. Bisa juga: \"Moci, mode nyetir\"."))
 
-        @Suppress("UseSwitchCompatOrMaterialCode")
-        val shakeSwitch = Switch(this).apply {
-            text = "📳 Goyang HP untuk memanggil Moci (buka chat)"
-            isChecked = shakeSummon
-            setOnCheckedChangeListener { _, on -> shakeSummon = on; toastStatus("Restart pet agar berlaku") }
-        }
-        col.addView(shakeSwitch)
-
-        @Suppress("UseSwitchCompatOrMaterialCode")
-        val moodSwitch = Switch(this).apply {
-            text = "Cek mood lewat kamera depan tiap jam"
-            isChecked = moodCheckEnabled
-            setOnCheckedChangeListener { _, on -> moodCheckEnabled = on }
-        }
-        col.addView(moodSwitch)
-
-        @Suppress("UseSwitchCompatOrMaterialCode")
-        val imgSwitch = Switch(this).apply {
-            text = "Kirim foto mood ke agent (bukan cuma ringkasan)"
-            isChecked = sendMoodImage
-            setOnCheckedChangeListener { _, on -> sendMoodImage = on }
-        }
-        col.addView(imgSwitch)
-
         col.addView(button("❓ Cara main dengan pet") { Help.gestures(this) })
         col.addView(button("🧙 Buka panduan setup (wizard)") {
             startActivity(Intent(this, WizardActivity::class.java))
@@ -304,31 +270,7 @@ class MainActivity : Activity() {
                 .setMessage(log.take(4000)).setPositiveButton("Tutup", null).show()
         })
 
-        // --- walkie-talkie LAN (WiFi yang sama, tanpa server) ---
-        col.addView(section("4. 📡 Walkie-talkie (WiFi)"))
-        col.addView(TextView(this).apply { text = "Nama tampilanmu di walkie:" })
-        val nickInput = EditText(this).apply { setText(lanDisplayName()); hint = "mis. Adit" }
-        col.addView(nickInput)
-        col.addView(hint("Pasang aplikasi ini di 2 HP, sambungkan ke WiFi yang SAMA. Teman muncul otomatis — tanpa internet, tanpa server."))
-        col.addView(hint("Di kotak chat pet: 📡 = kirim teks ke teman, tahan 🎙️ = kirim suara, ➤ = ngobrol ke AI."))
-        col.addView(button("Simpan nama walkie") {
-            lanNick = nickInput.text.toString().trim()
-            nickInput.setText(lanDisplayName())
-            toastStatus("Nama disimpan — restart pet agar aktif")
-        })
-        col.addView(button("👥 Lihat teman terdeteksi") {
-            val list = LanLink.peerNames()
-            val msg = when {
-                !LanLink.isRunning() -> "Hidupkan pet dulu agar walkie aktif."
-                list.isEmpty() -> "Belum ada teman di WiFi ini.\nPastikan HP lain juga menyalakan pet di WiFi yang sama."
-                else -> "Teman online:\n• " + list.joinToString("\n• ")
-            }
-            android.app.AlertDialog.Builder(this).setTitle("📡 Teman di WiFi")
-                .setMessage(msg).setPositiveButton("Tutup", null).show()
-        })
-
-        // --- v2 fase 4: data & homelab ---
-        col.addView(section("4b. 🏠 Data & homelab"))
+        // --- SMS ---
         @Suppress("UseSwitchCompatOrMaterialCode")
         val smsSwitch = Switch(this).apply {
             text = "Izinkan Moci membaca SMS masuk"
@@ -342,33 +284,6 @@ class MainActivity : Activity() {
         }
         col.addView(smsSwitch)
         col.addView(hint("Default mati. Kirim SMS & telepon selalu minta konfirmasimu dulu."))
-        fun field(label: String, value: String, h: String, secret: Boolean = false): EditText {
-            col.addView(TextView(this).apply { text = label })
-            return EditText(this).apply {
-                setText(value); hint = h; isSingleLine = true
-                if (secret) inputType = android.text.InputType.TYPE_CLASS_TEXT or
-                    android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD
-            }.also { col.addView(it) }
-        }
-        val urlInput = field("Folder WebDAV backup foto:", backupUrl, "http://192.168.1.10:8080/dav/foto")
-        val userInput = field("User WebDAV (opsional):", backupUser, "")
-        val passInput = field("Password WebDAV (opsional):", backupPass, "", secret = true)
-        val ssidInput = field("Nama WiFi rumah (backup otomatis saat tersambung):", homeSsid, "WiFi Rumah")
-        val tokenInput = field("Token perintah homelab (cari HP):", homelabToken, "rahasia panjang", secret = true)
-        col.addView(hint("Homelab kirim {\"cmd\":\"find_phone\",\"token\":\"…\"} ke port " +
-            "${LanLink.FIXED_PORT} → HP bunyi 30 detik & balas lokasi GPS. Token kosong = ditolak."))
-        col.addView(button("Simpan data & homelab") {
-            backupUrl = urlInput.text.toString(); backupUser = userInput.text.toString()
-            backupPass = passInput.text.toString(); homeSsid = ssidInput.text.toString()
-            homelabToken = tokenInput.text.toString()
-            toastStatus("Disimpan")
-        })
-        col.addView(button("📤 Backup foto sekarang") {
-            toastStatus("Backup berjalan…")
-            LanLink.backupPhotos(this) { n, err ->
-                runOnUiThread { toastStatus(err?.let { "Backup: $n terunggah, gagal: $it" } ?: "Backup selesai: $n foto") }
-            }
-        })
 
         // --- start/stop ---
         col.addView(section("5. Jalankan"))

@@ -81,12 +81,6 @@ object Actions {
             "search_file" -> FileOps.search(ctx, action.optString("name"))
             "storage_report" -> FileOps.report(ctx)
             "clear_cache_app" -> FileOps.openAppStorage(ctx, action.optString("app"))
-            "backup_photos" -> {
-                LanLink.backupPhotos(ctx) { n, err ->
-                    PetLog.add(ctx, "aksi", "📷 backup foto: $n terunggah" + (err?.let { " ($it)" } ?: ""))
-                }
-                "Backup foto ke homelab dimulai 📤"
-            }
             // --- v2 fase 5: mode praktis ---
             "driving_mode" -> {
                 ctx.drivingMode = action.optBoolean("on", true)

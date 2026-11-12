@@ -14,8 +14,8 @@ multi-step, punya memori & perasaan — semua dalam **satu aplikasi Android** ya
   (butuh model vision, lihat di bawah).
 - **Kontrol HP** — volume, senter, kecerahan, musik, buka aplikasi apa pun, panel
   WiFi/Bluetooth, Jangan Ganggu, alarm, pengingat, catatan, cek lokasi/GPS.
-- **Indra** — notifikasi masuk, cuaca (ikut lokasi), cahaya, langkah, kalender, baterai,
-  cek mood lewat kamera depan (opsional).
+- **Indra** — notifikasi masuk, cuaca (ikut lokasi), cahaya, langkah, baterai,
+  dan kalender.
 - **Rawat (Tamagotchi)** — kasih makan 🍬, dia senang; diabaikan, dia lesu.
 - **Memori & skill** — ingat hal penting tentangmu; bisa membuat skill/makro sendiri.
 
@@ -53,12 +53,7 @@ multi-step, punya memori & perasaan — semua dalam **satu aplikasi Android** ya
 **Fase 4 — Komunikasi & data**
 - **Telepon & SMS**: *"telepon Budi"*, *"SMS Ibu: aku pulang telat"* — nomor dicari dari
   kontak; Moci **selalu minta konfirmasi** sebelum menelepon/mengirim. *"baca SMS terbaru"*
-  hanya kalau dinyalakan di Pengaturan → Data & homelab (default mati).
-- **Cari HP dari homelab**: kirim `{"cmd":"find_phone","token":"…"}` ke HP port `47474`
-  (frame LanLink tipe 3) → HP bunyi keras 30 detik & membalas koordinat GPS.
-  Contoh: `python3 scripts/find_phone.py <ip-hp> <token>`.
-- **Backup foto ke homelab**: isi folder WebDAV (+user/pass) & nama WiFi rumah → foto baru
-  diunggah otomatis saat tersambung WiFi rumah (maks 50 per putaran), atau *"backup foto"*.
+  hanya kalau dinyalakan di Pengaturan (default mati).
 - **Clipboard manager**: riwayat 50 teks yang kamu salin (lewat aksesibilitas / saat chat
   dibuka) — *"apa yang tadi kusalin?"*, *"cari clipboard berisi alamat"*, *"salin teks ini"*.
 - **File & penyimpanan**: *"cari file invoice"*, *"laporan penyimpanan"* (sisa ruang, foto/
@@ -73,8 +68,6 @@ multi-step, punya memori & perasaan — semua dalam **satu aplikasi Android** ya
 - **Teks layar (OCR via aksesibilitas)**: *"salin semua teks di layar"* (`copy_screen`),
   *"rangkum layar ini"*, *"terjemahkan layar ini ke Inggris"* — tanpa screenshot, langsung
   dari teks yang terbaca aksesibilitas.
-- **Goyang untuk memanggil** 📳: goyang HP 2× → pill mekar & kotak chat terbuka. Bisa
-  dimatikan di Pengaturan → Pet.
 
 ## Pasang & jalankan
 

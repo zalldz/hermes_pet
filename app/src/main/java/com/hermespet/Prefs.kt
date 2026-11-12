@@ -62,36 +62,6 @@ object Prefs {
         get() = sp(this).getBoolean("music_dance", true)
         set(v) = sp(this).edit().putBoolean("music_dance", v).apply()
 
-    // --- Walkie-talkie LAN ([[LanLink]]) — peer-to-peer di WiFi sama, tanpa server ---
-    /** ID Moci unik (dibuat sekali) — untuk membedakan perangkat di jaringan. */
-    var Context.mociId: String
-        get() {
-            var id = sp(this).getString("moci_id", "") ?: ""
-            if (id.isBlank()) {
-                id = (1..6).map { "ABCDEFGHJKLMNPQRSTUVWXYZ23456789".random() }.joinToString("")
-                sp(this).edit().putString("moci_id", id).apply()
-            }
-            return id
-        }
-        set(v) = sp(this).edit().putString("moci_id", v).apply()
-
-    /** Nama tampilan di walkie-talkie LAN (kosong = "Moci-<id>"). */
-    var Context.lanNick: String
-        get() = sp(this).getString("lan_nick", "") ?: ""
-        set(v) = sp(this).edit().putString("lan_nick", v.trim()).apply()
-
-    /** Nama efektif yang dipakai & dikirim ke teman. */
-    fun Context.lanDisplayName(): String = lanNick.ifBlank { "Moci-$mociId" }
-
-    var Context.moodCheckEnabled: Boolean
-        get() = sp(this).getBoolean("mood_enabled", false)
-        set(v) = sp(this).edit().putBoolean("mood_enabled", v).apply()
-
-    /** Kirim foto mood ke agent (selain ringkasan ML Kit). */
-    var Context.sendMoodImage: Boolean
-        get() = sp(this).getBoolean("send_mood_image", false)
-        set(v) = sp(this).edit().putBoolean("send_mood_image", v).apply()
-
     /** Kepribadian pet (SOUL.md) — jadi system prompt otak. Bisa diedit pengguna. */
     const val DEFAULT_SOUL =
         "Kamu adalah Moci, slime biru mungil yang hidup di layar HP pemilikmu — imut, " +
@@ -165,44 +135,11 @@ object Prefs {
         get() = sp(this).getBoolean("sms_read", false)
         set(v) = sp(this).edit().putBoolean("sms_read", v).apply()
 
-    /** Token rahasia untuk perintah dari homelab (find_phone). Kosong = perintah ditolak. */
-    var Context.homelabToken: String
-        get() = sp(this).getString("homelab_token", "") ?: ""
-        set(v) = sp(this).edit().putString("homelab_token", v.trim()).apply()
-
-    /** Folder WebDAV tujuan backup foto, mis. http://192.168.1.10:8080/dav/foto */
-    var Context.backupUrl: String
-        get() = sp(this).getString("backup_url", "") ?: ""
-        set(v) = sp(this).edit().putString("backup_url", v.trim()).apply()
-
-    var Context.backupUser: String
-        get() = sp(this).getString("backup_user", "") ?: ""
-        set(v) = sp(this).edit().putString("backup_user", v.trim()).apply()
-
-    var Context.backupPass: String
-        get() = sp(this).getString("backup_pass", "") ?: ""
-        set(v) = sp(this).edit().putString("backup_pass", v).apply()
-
-    /** Backup hanya jalan saat tersambung WiFi rumah ini. */
-    var Context.homeSsid: String
-        get() = sp(this).getString("home_ssid", "") ?: ""
-        set(v) = sp(this).edit().putString("home_ssid", v.trim()).apply()
-
-    /** DATE_ADDED (detik) foto terakhir yang sudah ter-backup. */
-    var Context.lastBackupSec: Long
-        get() = sp(this).getLong("last_backup_sec", 0L)
-        set(v) = sp(this).edit().putLong("last_backup_sec", v).apply()
-
     // --- v2 fase 5: mode praktis ---
     /** Mode nyetir: chat masuk dibacakan TTS (walau suara pet dimatikan). */
     var Context.drivingMode: Boolean
         get() = sp(this).getBoolean("driving_mode", false)
         set(v) = sp(this).edit().putBoolean("driving_mode", v).apply()
-
-    /** Goyang HP → Moci muncul & buka chat. */
-    var Context.shakeSummon: Boolean
-        get() = sp(this).getBoolean("shake_summon", true)
-        set(v) = sp(this).edit().putBoolean("shake_summon", v).apply()
 
     var Context.petX: Int
         get() = sp(this).getInt("pet_x", 100)

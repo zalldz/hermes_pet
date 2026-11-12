@@ -36,18 +36,14 @@ import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.TextView
 import com.hermespet.Prefs.drivingMode
-import com.hermespet.Prefs.homeSsid
 import com.hermespet.Prefs.latitude
-import com.hermespet.Prefs.shakeSummon
 import com.hermespet.Prefs.longitude
-import com.hermespet.Prefs.moodCheckEnabled
 import com.hermespet.Prefs.musicDance
 import com.hermespet.Prefs.petScale
 import com.hermespet.Prefs.petVoice
 import com.hermespet.Prefs.petX
 import com.hermespet.Prefs.petY
 import com.hermespet.Prefs.fadeIdleSec
-import com.hermespet.Prefs.sendMoodImage
 import org.json.JSONObject
 import java.util.Calendar
 import java.util.Locale
@@ -63,7 +59,6 @@ class PetOverlayService : Service() {
         private const val BASE_SIZE_DP = 144 // View lebih besar; sprite isi ~66% + ruang gerak
         private const val FADE_ALPHA = 0.22f
         private const val TICK_MS = 60_000L
-        private const val MOOD_MS = 60 * 60_000L // tiap jam
         private const val WALK_FRAME_MS = 33L // ~30 fps (hemat baterai)
         /** Aplikasi chat yang dibacakan saat mode nyetir. */
         private val CHAT_APPS = listOf("com.whatsapp", "org.telegram", "org.thunderdog.challegram",
@@ -125,43 +120,13 @@ class PetOverlayService : Service() {
         })
         handler.post(walkLoop)
         handler.postDelayed(tickLoop, 5_000)
-        handler.postDelayed(moodLoop, 20_000) // cek pertama tak lama setelah start
         handler.post(moodTick)
         handler.postDelayed(musicLoop, 3_000)
         handler.postDelayed(fadeLoop, 5_000)
         setupFullscreenProbe()
-        startLan()
-        startShake()
         pet.emotion = Mood.current(this)
         say("Halo! Aku hidup! 🐾", PetView.Emotion.HAPPY)
         transientUntil = System.currentTimeMillis() + 8_000
-    }
-
-    /** Walkie-talkie LAN: dengarkan teks/suara dari teman di WiFi yang sama. */
-    private fun startLan() {
-        LanLink.start(this) { type, from, data ->
-            handler.post {
-                when (type) {
-                    LanLink.TYPE_VOICE -> {
-                        say("🔊 Pesan suara dari $from", PetView.Emotion.SURPRISED)
-                        transientUntil = System.currentTimeMillis() + 6_000
-                        VoiceMsg.play(this, data)
-                        PetLog.add(this, "aksi", "🎙️ suara dari $from (LAN)")
-                    }
-                    LanLink.TYPE_CMD -> {
-                        val cmd = String(data, Charsets.UTF_8)
-                        if (cmd == "find_phone") say("🔔 Homelab mencari HP ini!", PetView.Emotion.SURPRISED)
-                        PetLog.add(this, "aksi", "🏠 perintah homelab: $cmd")
-                    }
-                    LanLink.TYPE_TEXT -> {
-                        val msg = String(data, Charsets.UTF_8)
-                        say("💬 $from: $msg", PetView.Emotion.HAPPY)
-                        transientUntil = System.currentTimeMillis() + 6_000
-                        PetLog.add(this, "user", "[$from via LAN] $msg")
-                    }
-                }
-            }
-        }
     }
 
     // --- hemat baterai + sapaan proaktif ---
@@ -172,10 +137,9 @@ class PetOverlayService : Service() {
             when (i?.action) {
                 Intent.ACTION_SCREEN_OFF -> { // layar mati: sensor goyang ikut mati (hemat baterai)
                     screenOn = false; pet.awake = false; stopVisualizer()
-                    (getSystemService(SENSOR_SERVICE) as android.hardware.SensorManager).unregisterListener(shake)
                 }
                 Intent.ACTION_SCREEN_ON -> {
-                    screenOn = true; pet.awake = !dormant; startShake()
+                    screenOn = true; pet.awake = !dormant
                     pet.emotion = Mood.current(this@PetOverlayService)
                 }
                 Intent.ACTION_USER_PRESENT -> maybeGreet() // buka kunci → sapa
@@ -206,10 +170,7 @@ class PetOverlayService : Service() {
         handler.removeCallbacksAndMessages(null)
         Senses.stop(this)
         stopVisualizer()
-        LanLink.stop()
         Comms.stopRing()
-        (getSystemService(SENSOR_SERVICE) as android.hardware.SensorManager).unregisterListener(shake)
-        VoiceMsg.stop()
         tts?.shutdown()
         runCatching { unregisterReceiver(screenReceiver) }
         closeChat()
@@ -399,8 +360,6 @@ class PetOverlayService : Service() {
             }
         }
         val eye = toolBtn("👁", "Lihat")  // lihat layar
-        val fren = toolBtn("📡", "Teman")  // kirim teks ke teman di WiFi
-        val ptt = toolBtn("🎙️", "Tahan")  // tahan = pesan suara ke teman
         val send = Button(this).apply { // kirim ke AI (Moci)
             text = "➤"; isAllCaps = false
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 18f)
@@ -431,8 +390,6 @@ class PetOverlayService : Service() {
             orientation = LinearLayout.HORIZONTAL
             setPadding(0, dp(8f).toInt(), 0, 0)
             addView(eye, cell(true))
-            addView(fren, cell(false))
-            addView(ptt, cell(false))
         }
         val row = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -482,61 +439,6 @@ class PetOverlayService : Service() {
             closeChat()
             lookAtScreen(q)
         }
-        fren.setOnClickListener {
-            val text = input.text.toString().trim()
-            if (text.isEmpty()) {
-                say("Ketik dulu pesannya 🙂", null)
-                transientUntil = System.currentTimeMillis() + 2_000
-                return@setOnClickListener
-            }
-            input.setText("")
-            LanLink.sendText(this, text) { n ->
-                handler.post {
-                    if (n > 0) {
-                        say("📡 Terkirim ke $n HP", PetView.Emotion.HAPPY)
-                        PetLog.add(this, "user", "[ke teman LAN] $text")
-                    } else {
-                        say("Tidak ada teman di WiFi ini 🥺", PetView.Emotion.SAD)
-                    }
-                    transientUntil = System.currentTimeMillis() + 3_000
-                }
-            }
-        }
-        ptt.setOnTouchListener { _, ev ->
-            when (ev.action) {
-                MotionEvent.ACTION_DOWN -> {
-                    if (VoiceMsg.startRecording(this)) {
-                        ptt.text = "🔴\nLepas"
-                        say("🎙️ Merekam... lepas untuk kirim", PetView.Emotion.SURPRISED)
-                        transientUntil = System.currentTimeMillis() + 30_000
-                    } else {
-                        say("Mic tidak bisa dipakai 🥺", PetView.Emotion.SAD)
-                        transientUntil = System.currentTimeMillis() + 3_000
-                    }
-                    true
-                }
-                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
-                    ptt.text = "🎙️\nTahan"
-                    val bytes = VoiceMsg.stopRecording()
-                    if (bytes == null) {
-                        say("Rekaman terlalu singkat 🙈", null)
-                        transientUntil = System.currentTimeMillis() + 2_500
-                    } else {
-                        LanLink.sendVoice(this, bytes) { n ->
-                            handler.post {
-                                say(if (n > 0) "📡 Suara terkirim ke $n HP"
-                                    else "Tidak ada teman di WiFi ini 🥺",
-                                    if (n > 0) PetView.Emotion.HAPPY else PetView.Emotion.SAD)
-                                transientUntil = System.currentTimeMillis() + 3_000
-                            }
-                        }
-                    }
-                    true
-                }
-                else -> false
-            }
-        }
-
         wm.addView(row, clp)
         chatView = row
         input.requestFocus()
@@ -568,27 +470,17 @@ class PetOverlayService : Service() {
     private fun checkRules(cur: Rules.State) {
         val prev = prevRuleState
         prevRuleState = cur
-        maybeBackup(prev, cur)
         val acts = Rules.evaluate(this, prev, cur)
         if (acts.isEmpty()) return
         val queue = ArrayList<JSONObject>()
         for (a in acts) when (a.optString("type")) {
             "notify" -> { say("⚙️ ${a.optString("text")}", PetView.Emotion.SURPRISED); speak(a.optString("text")) }
             "brain" -> sendToBrain("chat", JSONObject().put("text", a.optString("text")))
+            "skill", "mcp" -> Rules.homelabPrompt(a)?.let { sendToBrain("chat", JSONObject().put("text", it)) }
             else -> queue.add(a)
         }
         PetLog.add(this, "aksi", "⚙️ otomasi: ${acts.joinToString { it.optString("type") }}")
         if (queue.isNotEmpty()) runActionQueue(queue, sayFeedback = true)
-    }
-
-    /** Baru tersambung ke WiFi rumah → backup foto baru ke homelab (kalau URL diisi). */
-    private fun maybeBackup(prev: Rules.State?, cur: Rules.State) {
-        val home = homeSsid
-        if (home.isEmpty() || cur.ssid == prev?.ssid || !home.equals(cur.ssid, ignoreCase = true)) return
-        LanLink.backupPhotos(this) { n, err ->
-            PetLog.add(this, "aksi", "📷 backup foto: $n terunggah" + (err?.let { " ($it)" } ?: ""))
-            if (n > 0) handler.post { say("📤 $n foto ter-backup ke homelab", PetView.Emotion.HAPPY) }
-        }
     }
 
     /** Dipanggil aksesibilitas saat aplikasi di depan berganti. */
@@ -738,39 +630,6 @@ class PetOverlayService : Service() {
     // ---------------------------------------------------------------- suara
 
     private var tts: TextToSpeech? = null
-
-    // ---------------------------------------------------------------- goyang untuk memanggil (v2)
-
-    private var shakeAt = 0L
-    private var shakeCount = 0
-    private val shake = object : android.hardware.SensorEventListener {
-        override fun onSensorChanged(e: android.hardware.SensorEvent) {
-            val g = Math.sqrt((e.values[0] * e.values[0] + e.values[1] * e.values[1] +
-                e.values[2] * e.values[2]).toDouble()) / android.hardware.SensorManager.GRAVITY_EARTH
-            if (g < 2.5) return
-            val now = System.currentTimeMillis()
-            // dua hentakan dalam 0,8 detik = goyang (cegah salah picu saat jalan)
-            shakeCount = if (now - shakeAt < 800) shakeCount + 1 else 1
-            shakeAt = now
-            if (shakeCount >= 2 && screenOn) { shakeCount = -10; handler.post { onShake() } }
-        }
-        override fun onAccuracyChanged(s: android.hardware.Sensor?, a: Int) {}
-    }
-
-    private fun startShake() {
-        if (!shakeSummon) return
-        val sm = getSystemService(SENSOR_SERVICE) as android.hardware.SensorManager
-        sm.getDefaultSensor(android.hardware.Sensor.TYPE_ACCELEROMETER)?.let {
-            sm.registerListener(shake, it, android.hardware.SensorManager.SENSOR_DELAY_UI)
-        }
-    }
-
-    private fun onShake() {
-        lastActivityAt = System.currentTimeMillis()
-        wake()
-        if (chatView == null) toggleChat()
-        PetLog.add(this, "aksi", "📳 dipanggil lewat goyang")
-    }
 
     private fun speak(text: String) {
         if (!petVoice) return
@@ -1001,20 +860,6 @@ class PetOverlayService : Service() {
             checkRules(ruleState())
             Usage.foreground(this@PetOverlayService)?.let { checkLimit(it) }
             handler.postDelayed(this, TICK_MS)
-        }
-    }
-
-    private val moodLoop = object : Runnable {
-        override fun run() {
-            if (moodCheckEnabled && hasCameraPermission()) {
-                MoodCamera.capture(this@PetOverlayService, sendMoodImage) { result ->
-                    PetLog.add(this@PetOverlayService, "mood",
-                        "wajah=${result.optBoolean("face_detected")} " +
-                            "tebakan=${result.optString("mood_guess", "-")}")
-                    sendToBrain("mood", result)
-                }
-            }
-            handler.postDelayed(this, MOOD_MS)
         }
     }
 
@@ -1427,9 +1272,6 @@ class PetOverlayService : Service() {
 
     // ---------------------------------------------------------------- foreground
 
-    private fun hasCameraPermission(): Boolean =
-        checkSelfPermission(Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
-
     private fun startAsForeground() {
         val channelId = "hermespet"
         val nm = getSystemService(NotificationManager::class.java)
@@ -1451,7 +1293,6 @@ class PetOverlayService : Service() {
 
         if (Build.VERSION.SDK_INT >= 30) {
             var type = ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
-            if (hasCameraPermission()) type = type or ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA
             if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
                 type = type or ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE
             }

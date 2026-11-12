@@ -21,14 +21,13 @@ object Permissions {
 
     data class Perm(val label: String, val granted: Boolean, val essential: Boolean)
 
-    /** Izin baca foto/media (backup foto & cari file). */
+    /** Izin baca foto/media (cari file). */
     // dideklarasikan sebelum `runtime` (urutan inisialisasi object)
     val mediaPerm = if (Build.VERSION.SDK_INT >= 33) Manifest.permission.READ_MEDIA_IMAGES
         else Manifest.permission.READ_EXTERNAL_STORAGE
 
     /** Izin runtime biasa yang bisa diminta lewat dialog sistem sekaligus. */
     private val runtime: List<String> = buildList {
-        add(Manifest.permission.CAMERA)
         add(Manifest.permission.RECORD_AUDIO)
         add(Manifest.permission.ACCESS_COARSE_LOCATION)
         add(Manifest.permission.ACCESS_FINE_LOCATION)
@@ -101,7 +100,6 @@ object Permissions {
         Perm("Baca notifikasi", notifListener(ctx), essential = false),
         Perm("Aksesibilitas (baca layar, tap, ketik)", accessibility(ctx), false),
         Perm("Data penggunaan (screen time & batas app)", Usage.granted(ctx), false),
-        Perm("Kamera (cek mood)", has(ctx, Manifest.permission.CAMERA), false),
         Perm("Mikrofon (perintah suara)", has(ctx, Manifest.permission.RECORD_AUDIO), false),
         Perm("Lokasi (cuaca otomatis)", has(ctx, Manifest.permission.ACCESS_COARSE_LOCATION), false),
         Perm("Aktivitas (hitung langkah)",
@@ -110,7 +108,7 @@ object Permissions {
         Perm("Kontak & telepon (\"telepon Budi\")", has(ctx, Manifest.permission.READ_CONTACTS) &&
             has(ctx, Manifest.permission.CALL_PHONE), false),
         Perm("Kirim SMS (selalu dikonfirmasi)", has(ctx, Manifest.permission.SEND_SMS), false),
-        Perm("Foto & media (backup, cari file)", has(ctx, mediaPerm), false),
+        Perm("Foto & media (cari file)", has(ctx, mediaPerm), false),
         Perm("Notifikasi aplikasi",
             Build.VERSION.SDK_INT < 33 || has(ctx, Manifest.permission.POST_NOTIFICATIONS), false),
         Perm("Ubah setelan sistem (kecerahan)", writeSettings(ctx), false),

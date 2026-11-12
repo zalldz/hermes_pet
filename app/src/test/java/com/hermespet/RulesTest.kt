@@ -2,6 +2,7 @@ package com.hermespet
 
 import org.json.JSONObject
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -40,5 +41,12 @@ class RulesTest {
     @Test fun geo_enter() {
         val t = JSONObject("""{"type":"geo_enter","lat":-6.2,"lon":106.8,"radius":300}""")
         assertTrue(Rules.fires(t, st(lat = -6.25, lon = 106.8), st(lat = -6.2005, lon = 106.8)))
+    }
+
+    @Test fun homelab_prompt() {
+        val p = Rules.homelabPrompt(JSONObject("""{"type":"skill","name":"laporan","args":"harian"}"""))!!
+        assertTrue(p.contains("laporan") && p.contains("harian"))
+        assertTrue(Rules.homelabPrompt(JSONObject("""{"type":"mcp","tool":"docker_status"}"""))!!.contains("docker_status"))
+        assertNull(Rules.homelabPrompt(JSONObject("""{"type":"notify"}""")))
     }
 }

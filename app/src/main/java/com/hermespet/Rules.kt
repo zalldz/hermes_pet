@@ -67,6 +67,22 @@ object Rules {
         return if (found) "Otomasi \"$name\" kuhapus 🗑" else "Otomasi \"$name\" tidak ada 🤔"
     }
 
+    fun setEnabled(ctx: Context, name: String, on: Boolean) {
+        val all = load(ctx)
+        for (i in 0 until all.length()) all.optJSONObject(i)
+            ?.takeIf { it.optString("name") == name }?.put("enabled", on)
+        save(ctx, all)
+    }
+
+    /** Aksi "skill"/"mcp" dijalankan di homelab oleh otak (Claude) — HP hanya mengirim perintahnya. */
+    fun homelabPrompt(a: JSONObject): String? = when (a.optString("type")) {
+        "skill" -> "Otomasi menyala. Jalankan skill \"${a.optString("name")}\"" +
+            a.optString("args").let { if (it.isBlank()) "" else " dengan: $it" } + ". Lapor singkat hasilnya."
+        "mcp" -> "Otomasi menyala. Panggil tool MCP \"${a.optString("tool")}\"" +
+            a.optString("args").let { if (it.isBlank()) "" else " dengan argumen: $it" } + ". Lapor singkat hasilnya."
+        else -> null
+    }
+
     fun list(ctx: Context): List<JSONObject> {
         val all = load(ctx)
         return (0 until all.length()).mapNotNull { all.optJSONObject(it) }

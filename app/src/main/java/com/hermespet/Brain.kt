@@ -118,6 +118,7 @@ object Brain {
             "wifi_disconnect{ssid?} | battery_below{level} | battery_full | " +
             "geo_enter/geo_exit{lat,lon,radius meter} | app_open{app}; then: aksi apa pun, " +
             "atau {\"type\":\"notify\",\"text\":\"..\"} / {\"type\":\"brain\",\"text\":\"<perintah untukmu>\"}) | " +
+            "{\"type\":\"skill\",\"name\":\"..\"} | {\"type\":\"mcp\",\"tool\":\"..\",\"args\":\"..\"} (HANYA sebagai \"then\" rule: dijalankan di homelab) | " +
             "{\"type\":\"list_rules\"} | {\"type\":\"delete_rule\",\"name\":\"<nama>\"} | " +
             // --- v2: komunikasi & data ---
             "{\"type\":\"call\",\"to\":\"<nama kontak/nomor>\"} | " +
@@ -128,7 +129,6 @@ object Brain {
             "{\"type\":\"clipboard_set\",\"text\":\"..\"} (salin teks) | " +
             "{\"type\":\"search_file\",\"name\":\"<nama file>\"} | {\"type\":\"storage_report\"} | " +
             "{\"type\":\"clear_cache_app\",\"app\":\"<nama aplikasi>\"} | " +
-            "{\"type\":\"backup_photos\"} (unggah foto baru ke homelab) | " +
             // --- v2: mode praktis ---
             "{\"type\":\"driving_mode\",\"on\":true/false} (bacakan chat masuk saat nyetir) | " +
             "{\"type\":\"copy_screen\"} (salin semua teks layar ke clipboard). " +
@@ -160,7 +160,6 @@ object Brain {
         when (type) {
             "tick" -> handleTick(ctx, data, onReply)
             "notification" -> handleNotification(ctx, data, onReply)
-            "mood" -> handleMood(ctx, data, onReply)
             "poke" -> handlePoke(ctx, onReply)
             "chat" -> handleChat(ctx, data, onStream, onReply)
             "greet" -> handleGreet(ctx, data, onReply)
@@ -222,25 +221,6 @@ object Brain {
             "Pemilikmu dapat notifikasi dari aplikasi $pkg: '$title: $text'. " +
                 "Komentari singkat dan relevan, ingatkan kalau kelihatan penting.",
             "Psst, ada pesan: $title 👀", "surprised", onReply = onReply)
-    }
-
-    private fun handleMood(ctx: Context, data: JSONObject, onReply: (JSONObject?) -> Unit) {
-        if (!data.optBoolean("face_detected")) {
-            onReply(reply("Loh, kamu di mana? 👀", "surprised"))
-            return
-        }
-        val guess = data.optString("mood_guess", "neutral")
-        val smile = data.optDouble("smile", -1.0)
-        val fallback = when (guess) {
-            "happy" -> "Senyummu cerah banget hari ini! 😄" to "love"
-            "sleepy" -> "Matamu sayu... istirahat dulu yuk 😴" to "sleepy"
-            "flat" -> "Kamu kelihatan lelah... aku temenin ya 🥺" to "sad"
-            else -> "Semangat terus ya hari ini!" to "happy"
-        }
-        askHermes(ctx,
-            "Kamu baru melihat wajah pemilikmu lewat kamera depan. Tebakan mood: $guess " +
-                "(probabilitas senyum ${"%.2f".format(smile)}). Beri komentar empatik singkat.",
-            fallback.first, fallback.second, onReply = onReply)
     }
 
     /** Memori percakapan: 6 tukar-kata terakhir disertakan sebagai konteks. */
