@@ -361,6 +361,16 @@ class PetOverlayService : Service() {
             }
         }
         val eye = toolBtn("👁", "Lihat")  // lihat layar
+        fun iconBtn(res: Int, label: String) = toolBtn("", label).apply {
+            text = label
+            setCompoundDrawablesWithIntrinsicBounds(0, res, 0, 0)
+            compoundDrawables[1]?.setBounds(0, 0, dp(22f).toInt(), dp(22f).toInt())
+        }
+        val photoB = iconBtn(R.drawable.ic_photo, "Foto")
+        val videoB = iconBtn(if (MediaCapture.mode == MediaCapture.Mode.VIDEO) R.drawable.ic_stop else R.drawable.ic_video,
+            if (MediaCapture.mode == MediaCapture.Mode.VIDEO) "Stop" else "Video")
+        val micB = iconBtn(if (MediaCapture.mode == MediaCapture.Mode.AUDIO) R.drawable.ic_stop else R.drawable.ic_mic,
+            if (MediaCapture.mode == MediaCapture.Mode.AUDIO) "Stop" else "Suara")
         val send = Button(this).apply { // kirim ke AI (Moci)
             text = "➤"; isAllCaps = false
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 18f)
@@ -391,6 +401,9 @@ class PetOverlayService : Service() {
             orientation = LinearLayout.HORIZONTAL
             setPadding(0, dp(8f).toInt(), 0, 0)
             addView(eye, cell(true))
+            addView(photoB, cell(false))
+            addView(videoB, cell(false))
+            addView(micB, cell(false))
         }
         val row = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -426,7 +439,11 @@ class PetOverlayService : Service() {
         fun submit() {
             val text = input.text.toString().trim()
             closeChat()
-            if (text.isNotEmpty()) {
+            val local = if (text.isEmpty()) null else Local.parse(text)
+            if (local != null) {
+                PetLog.add(this, "user", text)
+                agentTask = ""; runActionQueue(local, true) // tanpa otak: cepat & offline
+            } else if (text.isNotEmpty()) {
                 PetLog.add(this, "user", text)
                 say("🤔...", null)
                 sendToBrain("chat", JSONObject().put("text", text))
@@ -446,6 +463,18 @@ class PetOverlayService : Service() {
                 .ifBlank { "Apa yang kamu lihat di layar ini? Jelaskan singkat." }
             closeChat()
             lookAtScreen(q)
+        }
+        fun media(type: String, vararg kv: Pair<String, Any>) {
+            Kenney.sfx(this, "click_001"); closeChat()
+            runActionQueue(listOf(JSONObject().put("type", type).put("_ok", true)
+                .apply { kv.forEach { put(it.first, it.second) } }), true)
+        }
+        photoB.setOnClickListener { media("capture_photo") }
+        videoB.setOnClickListener {
+            if (MediaCapture.mode == MediaCapture.Mode.VIDEO) media("capture_stop") else media("capture_video")
+        }
+        micB.setOnClickListener {
+            if (MediaCapture.mode == MediaCapture.Mode.AUDIO) media("capture_stop") else media("capture_audio")
         }
         wm.addView(row, clp)
         chatView = row
@@ -1290,6 +1319,12 @@ class PetOverlayService : Service() {
 
     // ---------------------------------------------------------------- foreground
 
+    /** Dipanggil sebelum foto/video: izin bisa baru diberikan setelah service jalan. */
+    fun refreshForegroundType() { runCatching { startAsForeground() } }
+
+    /** Umpan balik dari MediaCapture (dipanggil di main thread). */
+    fun report(msg: String) { PetLog.add(this, "aksi", msg); say(msg, null, typewriter = true) }
+
     private fun startAsForeground() {
         val channelId = "hermespet"
         val nm = getSystemService(NotificationManager::class.java)
@@ -1313,6 +1348,9 @@ class PetOverlayService : Service() {
             var type = ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
             if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
                 type = type or ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE
+            }
+            if (checkSelfPermission(Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
+                type = type or ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA
             }
             // tipe location hanya ditambah bila izin sudah ada → bisa baca GPS dari FGS
             if (checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED ||

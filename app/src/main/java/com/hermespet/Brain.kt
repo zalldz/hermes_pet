@@ -79,6 +79,9 @@ object Brain {
             "{\"type\":\"volume\",\"level\":0-100} | {\"type\":\"volume_up\"} | " +
             "{\"type\":\"volume_down\"} | {\"type\":\"mute\"} | " +
             "{\"type\":\"torch\",\"on\":true/false} (senter) | " +
+            "{\"type\":\"capture_photo\",\"front\":false} (foto kamera tanpa buka app) | " +
+            "{\"type\":\"capture_video\",\"seconds\":10,\"front\":false} | " +
+            "{\"type\":\"capture_audio\",\"seconds\":10} (rekam suara) | {\"type\":\"capture_stop\"} | " +
             "{\"type\":\"brightness\",\"level\":0-100} (kecerahan layar) | " +
             "{\"type\":\"media\",\"cmd\":\"play_pause|next|prev\"} (kontrol musik) | " +
             "{\"type\":\"open_app\",\"name\":\"<nama aplikasi>\"} | " +

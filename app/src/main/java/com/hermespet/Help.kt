@@ -14,6 +14,9 @@ object Help {
             🤾  Lempar     → lempar, dia memantul
             🤏  Cubit      → ubah ukuran
             👁  (di chat)  → suruh dia lihat layar
+            📷🎥🎙 (di chat) → foto / video / rekam suara tanpa buka kamera
+            Ketik langsung: "nyalakan senter", "buka kalkulator", "ambil foto",
+            "rekam video 10 detik", "rekam suara", "stop rekam" (tanpa AI)
 
             Pet juga berganti WARNA sesuai perasaannya:
             hijau senang • biru sedih • merah kesal • ungu ngantuk

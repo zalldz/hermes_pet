@@ -26,6 +26,7 @@ object Actions {
             "volume_up" -> adjust(ctx, AudioManager.ADJUST_RAISE)
             "volume_down" -> adjust(ctx, AudioManager.ADJUST_LOWER)
             "mute" -> setVolume(ctx, 0)
+            "capture_photo", "capture_video", "capture_audio", "capture_stop" -> capture(ctx, action)
             "torch" -> torch(ctx, action.optBoolean("on", true))
             "brightness" -> brightness(ctx, action.optInt("level", 50))
             "media" -> media(ctx, action.optString("cmd", "play_pause"))
@@ -113,6 +114,9 @@ object Actions {
             ?.labelAt(action.optInt("x"), action.optInt("y"))
             ?.takeIf { Parsers.isRiskyLabel(it) }
             ?.let { "Moci mau menekan \"$it\". Lanjut?" }
+        "capture_photo", "capture_video", "capture_audio" ->
+            "Moci mau ${when (action.optString("type")) { "capture_photo" -> "mengambil foto"
+                "capture_video" -> "merekam video"; else -> "merekam suara" }} diam-diam. Lanjut?"
         "add_rule" -> "Moci mau memasang otomasi \"${action.optString("name")}\": kalau " +
             "${action.optJSONObject("trigger")} → ${action.optJSONObject("then")}. Lanjut?"
         "call" -> PetOverlayService.instance?.let { Comms.confirmCall(it, action.optString("to")) }
@@ -203,6 +207,21 @@ object Actions {
             "prev" -> "Lagu sebelumnya ⏮"
             else -> "⏯"
         }
+    }
+
+    // ------------------------------------------------------------- kamera & suara
+    private fun capture(ctx: Context, a: JSONObject): String? {
+        val ui = android.os.Handler(android.os.Looper.getMainLooper())
+        val done: (String) -> Unit = { m -> ui.post { PetOverlayService.instance?.report(m) } }
+        val sec = a.optInt("seconds", 0)
+        PetOverlayService.instance?.refreshForegroundType() // tambah tipe camera/mic bila izin baru diberikan
+        when (a.optString("type")) {
+            "capture_photo" -> MediaCapture.photo(ctx, a.optBoolean("front"), done)
+            "capture_video" -> MediaCapture.video(ctx, a.optBoolean("front"), sec, done)
+            "capture_audio" -> MediaCapture.audio(ctx, sec, done)
+            else -> return MediaCapture.stop(ctx)
+        }
+        return null // hasil dilaporkan lewat callback
     }
 
     // ------------------------------------------------------------- senter
