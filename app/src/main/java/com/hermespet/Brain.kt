@@ -118,7 +118,8 @@ object Brain {
             "wifi_disconnect{ssid?} | battery_below{level} | battery_full | " +
             "geo_enter/geo_exit{lat,lon,radius meter} | app_open{app}; then: aksi apa pun, " +
             "atau {\"type\":\"notify\",\"text\":\"..\"} / {\"type\":\"brain\",\"text\":\"<perintah untukmu>\"}) | " +
-            "{\"type\":\"skill\",\"name\":\"..\"} | {\"type\":\"mcp\",\"tool\":\"..\",\"args\":\"..\"} (HANYA sebagai \"then\" rule: dijalankan di homelab) | " +
+            "{\"type\":\"skill\",\"name\":\"..\",\"args\":\"..\"} | {\"type\":\"mcp\",\"tool\":\"<server>.<tool>\",\"args\":{..}} | " +
+            "{\"type\":\"script\",\"name\":\"..\",\"args\":\"..\"} (HANYA sebagai \"then\" rule: dijalankan di homelab) | " +
             "{\"type\":\"list_rules\"} | {\"type\":\"delete_rule\",\"name\":\"<nama>\"} | " +
             // --- v2: komunikasi & data ---
             "{\"type\":\"call\",\"to\":\"<nama kontak/nomor>\"} | " +

@@ -43,10 +43,10 @@ class RulesTest {
         assertTrue(Rules.fires(t, st(lat = -6.25, lon = 106.8), st(lat = -6.2005, lon = 106.8)))
     }
 
-    @Test fun homelab_prompt() {
-        val p = Rules.homelabPrompt(JSONObject("""{"type":"skill","name":"laporan","args":"harian"}"""))!!
-        assertTrue(p.contains("laporan") && p.contains("harian"))
-        assertTrue(Rules.homelabPrompt(JSONObject("""{"type":"mcp","tool":"docker_status"}"""))!!.contains("docker_status"))
-        assertNull(Rules.homelabPrompt(JSONObject("""{"type":"notify"}""")))
+    @Test fun parse_import() {
+        val one = """{"name":"a","trigger":{"type":"battery_full"},"then":{"type":"script","name":"cek-disk"}}"""
+        assertTrue(Rules.parseImport(one).size == 1)
+        val arr = """[$one, {"name":"","trigger":{"type":"x"},"then":{"type":"y"}}, {"name":"b","trigger":{}}]"""
+        assertTrue(Rules.parseImport(arr).map { it.optString("name") } == listOf("a"))
     }
 }

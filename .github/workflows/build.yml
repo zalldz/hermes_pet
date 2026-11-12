@@ -46,18 +46,21 @@ jobs:
 
       # --- otomatis publish ke GitHub Releases (URL unduh langsung & stabil) ---
       - name: Baca versionName
+        if: github.ref == 'refs/heads/main' # build dari branch lain = artefak saja
         id: ver
         run: |
           V=$(grep -m1 versionName app/build.gradle.kts | sed -E 's/.*"([^"]+)".*/\1/')
           echo "version=$V" >> "$GITHUB_OUTPUT"
 
       - name: Siapkan berkas rilis (nama jelas berversi)
+        if: github.ref == 'refs/heads/main' # build dari branch lain = artefak saja
         run: |
           mkdir -p release
           cp app/build/outputs/apk/debug/app-debug.apk "release/mocipet-v${{ steps.ver.outputs.version }}.apk"
           cp app/build/outputs/bundle/release/app-release.aab "release/mocipet-v${{ steps.ver.outputs.version }}.aab"
 
       - name: Publish GitHub Release
+        if: github.ref == 'refs/heads/main' # build dari branch lain = artefak saja
         uses: softprops/action-gh-release@v3
         with:
           tag_name: v${{ steps.ver.outputs.version }}

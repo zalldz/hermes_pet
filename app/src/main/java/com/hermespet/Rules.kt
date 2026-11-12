@@ -11,7 +11,8 @@ import java.io.File
  * Trigger: time{hour,minute,days?[1=Min..7=Sab]} | wifi_connect{ssid} |
  *   wifi_disconnect{ssid?} | battery_below{level} | battery_full |
  *   geo_enter / geo_exit{lat,lon,radius(m)} | app_open{package}
- * Then: aksi apa pun dari [Actions] + "notify"{text} / "brain"{text} (dijalankan service).
+ * Then: aksi apa pun dari [Actions] + "notify"{text} / "brain"{text} (dijalankan service)
+ *   + skill{name,args} / mcp{tool:"server.tool",args:{}} / script{name,args} (dijalankan di homelab, lihat [Homelab]).
  *
  * Mesin berbasis TRANSISI: rule menyala sekali saat kondisinya baru berubah jadi benar,
  * tidak tiap menit selama kondisinya benar.
@@ -74,14 +75,25 @@ object Rules {
         save(ctx, all)
     }
 
-    /** Aksi "skill"/"mcp" dijalankan di homelab oleh otak (Claude) — HP hanya mengirim perintahnya. */
-    fun homelabPrompt(a: JSONObject): String? = when (a.optString("type")) {
-        "skill" -> "Otomasi menyala. Jalankan skill \"${a.optString("name")}\"" +
-            a.optString("args").let { if (it.isBlank()) "" else " dengan: $it" } + ". Lapor singkat hasilnya."
-        "mcp" -> "Otomasi menyala. Panggil tool MCP \"${a.optString("tool")}\"" +
-            a.optString("args").let { if (it.isBlank()) "" else " dengan argumen: $it" } + ". Lapor singkat hasilnya."
-        else -> null
+    /** Rule dari teks JSON (satu objek atau array) — MURNI, di-unit-test. Yang tidak lengkap dibuang. */
+    fun parseImport(text: String): List<JSONObject> {
+        val s = text.trim()
+        val arr = if (s.startsWith("[")) JSONArray(s) else JSONArray().put(JSONObject(s))
+        return (0 until arr.length()).mapNotNull { arr.optJSONObject(it) }.filter {
+            it.optString("name").isNotBlank() && it.optJSONObject("trigger")?.has("type") == true &&
+                it.optJSONObject("then")?.has("type") == true
+        }
     }
+
+    /** Impor JSON (nama sama = ditimpa). */
+    fun importJson(ctx: Context, text: String): String = try {
+        val rules = parseImport(text)
+        rules.forEach { add(ctx, it.optString("name"), it.optJSONObject("trigger"), it.optJSONObject("then")) }
+        if (rules.isEmpty()) "Tidak ada rule lengkap (butuh name, trigger.type, then.type) 🤔"
+        else "${rules.size} otomasi diimpor ⚙️"
+    } catch (e: Exception) { "JSON tidak valid: ${e.message}" }
+
+    fun exportJson(ctx: Context): String = load(ctx).toString(2)
 
     fun list(ctx: Context): List<JSONObject> {
         val all = load(ctx)

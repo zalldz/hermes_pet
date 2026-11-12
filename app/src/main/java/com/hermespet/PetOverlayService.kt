@@ -471,12 +471,22 @@ class PetOverlayService : Service() {
         val prev = prevRuleState
         prevRuleState = cur
         val acts = Rules.evaluate(this, prev, cur)
-        if (acts.isEmpty()) return
+        if (acts.isNotEmpty()) runRuleActions(acts)
+    }
+
+    /** Aksi "then" otomasi; juga dipanggil tombol ▶ di panel Kelola untuk uji coba. */
+    fun runRuleActions(acts: List<JSONObject>) {
         val queue = ArrayList<JSONObject>()
         for (a in acts) when (a.optString("type")) {
             "notify" -> { say("⚙️ ${a.optString("text")}", PetView.Emotion.SURPRISED); speak(a.optString("text")) }
             "brain" -> sendToBrain("chat", JSONObject().put("text", a.optString("text")))
-            "skill", "mcp" -> Rules.homelabPrompt(a)?.let { sendToBrain("chat", JSONObject().put("text", it)) }
+            in Homelab.TYPES -> {
+                say("⚙️ menjalankan ${a.optString("type")} di homelab…", PetView.Emotion.NEUTRAL)
+                Homelab.run(this, a) { ok, out ->
+                    PetLog.add(this, "aksi", "⚙️ ${a.optString("type")}: ${out.take(300)}")
+                    say((if (ok) "✅ " else "⚠️ ") + out.take(280), if (ok) PetView.Emotion.HAPPY else PetView.Emotion.SAD)
+                }
+            }
             else -> queue.add(a)
         }
         PetLog.add(this, "aksi", "⚙️ otomasi: ${acts.joinToString { it.optString("type") }}")
