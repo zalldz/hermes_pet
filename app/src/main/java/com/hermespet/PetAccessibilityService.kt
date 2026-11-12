@@ -100,21 +100,37 @@ class PetAccessibilityService : AccessibilityService() {
         }
     }
 
+    /**
+     * Jendela aplikasi lain di belakang Mocipet. Saat panel chat Mocipet terbuka, rootInActiveWindow
+     * = Mocipet sendiri, jadi cari jendela app paling atas yang bukan Mocipet/systemui/keyboard.
+     */
+    private fun appRoot(): AccessibilityNodeInfo? {
+        val own = rootInActiveWindow
+        if (own?.packageName?.toString().let { it != null && it != packageName }) return own
+        return windows.filter { it.type == android.view.accessibility.AccessibilityWindowInfo.TYPE_APPLICATION }
+            .sortedByDescending { it.layer }.firstNotNullOfOrNull { w ->
+                w.root?.takeIf { r -> r.packageName?.toString().let { it != null && it != packageName &&
+                    it != "com.android.systemui" && !it.contains("inputmethod") && !it.contains("keyboard") } }
+            } ?: own
+    }
+
     /** Semua teks yang terlihat di layar aktif. Tombol/isian diberi tag + titik tengah (x,y). */
-    fun screenText(): String = guard() ?: dump()
+    fun screenText(): String = guard(readOnly = true) ?: dump()
 
     /**
      * Pagar SEMUA aksi layar: app aktif harus di daftar putih & bukan app keuangan, dan isinya
      * bukan internet banking/OTP (browser). Null = boleh.
      */
-    private fun guard(): String? {
-        val root = rootInActiveWindow ?: return "(layar tidak terbaca)"
-        Guard.screenBlock(root.packageName?.toString())?.let { return it }
+    private fun guard(readOnly: Boolean = false): String? {
+        val root = appRoot() ?: return "(layar tidak terbaca)"
+        val pkg = root.packageName?.toString()
+        // baca saja boleh di app apa pun kecuali keuangan; kendali tetap daftar putih
+        (if (readOnly) Guard.MONEY_MSG.takeIf { Guard.isMoneyApp(pkg) } else Guard.screenBlock(pkg))?.let { return it }
         return if (Guard.isSensitiveText(dump())) Guard.MONEY_MSG else null
     }
 
     private fun dump(): String {
-        val root = rootInActiveWindow ?: return "(layar tidak terbaca)"
+        val root = appRoot() ?: return "(layar tidak terbaca)"
         val sb = StringBuilder("App: ${root.packageName}\n")
         fun walk(n: AccessibilityNodeInfo?, depth: Int) {
             if (n == null || sb.length > MAX_TEXT || depth > 40) return
@@ -141,7 +157,7 @@ class PetAccessibilityService : AccessibilityService() {
     }
 
     /** Teks layar tanpa tag/koordinat (untuk disalin ke clipboard). */
-    fun plainText(): String = guard() ?: dump().lines().drop(1)
+    fun plainText(): String = guard(readOnly = true) ?: dump().lines().drop(1)
         .map { it.removePrefix("[isian] ").removePrefix("[tombol] ").replace(Regex(" @\\d+,\\d+$"), "") }
         .filter { it.isNotBlank() }.joinToString("\n")
 
@@ -150,7 +166,7 @@ class PetAccessibilityService : AccessibilityService() {
 
     /** Elemen berlabel `q` (sama persis diutamakan, lalu yang mengandung). */
     private fun findNode(q: String): AccessibilityNodeInfo? {
-        val root = rootInActiveWindow ?: return null
+        val root = appRoot() ?: return null
         val hits = root.findAccessibilityNodeInfosByText(q).filter { it.isVisibleToUser }
         return hits.firstOrNull { label(it).equals(q.trim(), ignoreCase = true) } ?: hits.firstOrNull()
     }
@@ -166,7 +182,7 @@ class PetAccessibilityService : AccessibilityService() {
             label(n).takeIf { it.isNotEmpty() }?.let { best = it }
             for (i in 0 until n.childCount) walk(n.getChild(i))
         }
-        walk(rootInActiveWindow)
+        walk(appRoot())
         return best
     }
 
@@ -190,7 +206,7 @@ class PetAccessibilityService : AccessibilityService() {
     /** Ketik ke kolom yang sedang fokus (atau kolom isian pertama di layar). */
     fun type(text: String): String {
         guard()?.let { return it }
-        val root = rootInActiveWindow ?: return "Layar tidak terbaca 😖"
+        val root = appRoot() ?: return "Layar tidak terbaca 😖"
         val target = root.findFocus(AccessibilityNodeInfo.FOCUS_INPUT)?.takeIf { it.isEditable }
             ?: firstEditable(root) ?: return "Tidak ada kolom isian di layar 🤔"
         target.performAction(AccessibilityNodeInfo.ACTION_FOCUS)
@@ -219,7 +235,7 @@ class PetAccessibilityService : AccessibilityService() {
         guard()?.let { return it }
         val act = if (down) AccessibilityNodeInfo.ACTION_SCROLL_FORWARD
             else AccessibilityNodeInfo.ACTION_SCROLL_BACKWARD
-        if (firstScrollable(rootInActiveWindow)?.performAction(act) == true)
+        if (firstScrollable(appRoot())?.performAction(act) == true)
             return if (down) "Scroll ke bawah ⬇️" else "Scroll ke atas ⬆️"
         // tidak ada elemen scrollable → usap layar
         val dm = resources.displayMetrics
@@ -234,7 +250,7 @@ class PetAccessibilityService : AccessibilityService() {
 
     fun press(key: String): String {
         // tombol sistem (back/home) boleh di app mana pun untuk navigasi, kecuali app keuangan
-        if (Guard.isMoneyApp(rootInActiveWindow?.packageName?.toString())) return Guard.MONEY_MSG
+        if (Guard.isMoneyApp(appRoot()?.packageName?.toString())) return Guard.MONEY_MSG
         val a = when (key.lowercase().trim()) {
             "back", "kembali" -> GLOBAL_ACTION_BACK
             "home", "beranda" -> GLOBAL_ACTION_HOME
