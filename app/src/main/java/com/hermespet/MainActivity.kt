@@ -39,6 +39,7 @@ import com.hermespet.Prefs.moodCheckEnabled
 import com.hermespet.Prefs.musicDance
 import com.hermespet.Prefs.petScale
 import com.hermespet.Prefs.fadeIdleSec
+import com.hermespet.Prefs.petSkin
 import com.hermespet.Prefs.petVoice
 import com.hermespet.Prefs.sendMoodImage
 import com.hermespet.Prefs.setupDone
@@ -206,6 +207,17 @@ class MainActivity : Activity() {
                 override fun onStartTrackingTouch(sb: SeekBar?) {}
                 override fun onStopTrackingTouch(sb: SeekBar?) {}
             })
+        })
+
+        col.addView(TextView(this).apply { text = "Skin slime (aset Kenney, CC0):" })
+        val skins = listOf("classic" to "Klasik", "normal" to "Bulat", "fire" to "Api", "spike" to "Duri", "block" to "Kotak")
+        col.addView(android.widget.RadioGroup(this).apply {
+            orientation = android.widget.RadioGroup.VERTICAL
+            skins.forEachIndexed { i, (key, label) ->
+                addView(android.widget.RadioButton(this@MainActivity).apply { id = 1000 + i; text = label })
+            }
+            check(1000 + skins.indexOfFirst { it.first == petSkin }.coerceAtLeast(0))
+            setOnCheckedChangeListener { _, id -> petSkin = skins[id - 1000].first } // pet membaca ulang tiap detik
         })
 
         val fadeLabel = TextView(this)

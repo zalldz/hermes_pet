@@ -113,3 +113,6 @@ Tanpa API key pun pet tetap hidup dengan balasan bawaan (untuk coba-coba).
 Lihat [PERMISSIONS.md](PERMISSIONS.md) untuk daftar izin & review keamanan. Ringkas:
 aksi nyata hanya jalan dari perintahmu langsung (bukan dari notifikasi), file dibatasi
 ke `Documents/HermesPet`, dan tidak ada kirim-SMS/transaksi otomatis.
+
+## Skin slime
+Pengaturan → Pet → Skin slime: Klasik (piksel), Bulat, Api, Duri, Kotak. Aset Kenney CC0, lihat `app/src/main/assets/CREDITS.md`.
